@@ -1,3 +1,4 @@
 pandas==2.2.2
 numpy==1.26.4
 scipy==1.13.1
+stockpyl==1.0.0
