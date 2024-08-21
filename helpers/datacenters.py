@@ -19,7 +19,7 @@ class datacenter(object):
         if self.inventory_level + self.server_types[server_type].slots_size >= self.slots_capacity:
             return False
         
-        self.inventory[server_type].append([id,timestep])
+        self.inventory[server_type].append([timestep,id])
         self.inventory_level += self.server_types[server_type].slots_size
         return True
 
