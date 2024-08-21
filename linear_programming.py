@@ -1,4 +1,8 @@
+from typing import List
+
 from scipy.optimize import linprog
+
+import numpy as np
 
 
 def find_add_and_evict( inequality_matrix, inequality_vector, objective , decision_var_bounds ):
@@ -23,3 +27,69 @@ def find_add_and_evict( inequality_matrix, inequality_vector, objective , decisi
     ## decision_var_bounds
      
     return results.x
+
+
+
+
+def create_inequality_matrix(server_sizes: List[int] ):
+    
+
+    assert len(server_sizes)!=0 , "List of server sizes is empty" 
+    
+    cols = len(server_sizes) * 2
+    rows = 1 + len(server_sizes)
+
+
+    matrix = np.zeros( (rows,cols) )
+
+
+    
+    for i in range(len(server_sizes)):
+        matrix[0,2*i] =  server_sizes[i]
+        matrix[0,2*i +1] =  -server_sizes[i] 
+
+    for s in range(len(server_sizes)):
+
+
+        matrix[1+s,2*s] = 1
+        matrix[1+s,2*s+1] = -1
+
+
+        
+
+
+    
+    return matrix
+
+
+
+    
+
+
+def create_inequality_vector(remaining_capacity: int, server_demands: List[int], server_stock:List[int]):
+
+    ## remaining capacity = capacity left in datacenter 
+    ## server_demands = list of demand for each type of server
+    ## server_stock = the current amount of each server type in the data centre
+
+    assert len(server_demands) == len(server_stock), "Size of server demands does not match size of server stock"
+    
+    ## create large enough vector 
+    vector = np.zeros(1+len(server_demands))
+
+
+    vector[0] = remaining_capacity
+
+    ## for each server add the demand that is yet to be met 
+    for i in range(len(server_demands)):
+
+        vector[i+1] = ( server_demands[i] - server_stock[i]   )
+    
+    return vector
+
+
+
+## need to factor in cost of energy, at data centre with energy consumption of server 
+def create_objective_vector(selling_prices: List[float] , ):
+    pass
+
