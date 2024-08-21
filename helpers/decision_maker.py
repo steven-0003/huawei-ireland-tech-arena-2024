@@ -16,4 +16,4 @@ class decision_maker(object):
 
     def addServerTypes(self, server_types):
         for server_type in server_types:
-            self.server_types[server_type.name] = server_types
+            self.server_types[server_type.name] = server_type
