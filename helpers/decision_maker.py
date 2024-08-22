@@ -141,9 +141,9 @@ class DecisionMaker(object):
         remaining_capacity_sum = 0
         for datacenter in datacenters.keys():
             energy_cost_sum += datacenters[datacenter].cost_of_energy
-            remaining_capacity_sum += datacenters[datacenter].remaingingCapacity()
+            remaining_capacity_sum += datacenters[datacenter].remainingCapacity()
         
-        return {d: self.calculateCoeff(datacenters[d].cost_of_energy, datacenters[d].remaingingCapacity(),
+        return {d: self.calculateCoeff(datacenters[d].cost_of_energy, datacenters[d].remainingCapacity(),
                                        energy_cost_sum, remaining_capacity_sum) for d in datacenters.keys()}
         
 

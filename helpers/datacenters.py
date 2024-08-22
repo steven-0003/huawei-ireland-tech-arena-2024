@@ -38,5 +38,5 @@ class Datacenter(object):
                 else:
                     break
 
-    def remaingingCapacity(self) -> int:
+    def remainingCapacity(self) -> int:
         return self.slots_capacity - self.inventory_level
