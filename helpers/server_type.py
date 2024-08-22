@@ -2,16 +2,22 @@
 class Server(object):
     def __init__(self, name: str, release_time: list[int], purchase_price: float, slots_size: int, 
                  energy_consumption: float, capacity: int, life_expectancy: int, cost_of_moving: float, 
-                 avg_maintenance_fee: float) -> None:
+                 avg_maintenance_fee: float, latency_sensitivity:str, selling_price:float = 0) -> None:
         self.name = name
         self.release_time = release_time
         self.purchase_price = purchase_price
+        self.selling_price = selling_price
         self.slots_size = slots_size
         self.energy_consumption = energy_consumption
         self.capacity = capacity
         self.life_expectancy = life_expectancy
         self.cost_of_moving = cost_of_moving
         self.avg_maintenance_fee = avg_maintenance_fee
+        self.latency_sensitivity = latency_sensitivity
+
+
+    def setSellingPrice(self, new_price):
+        self.selling_price = new_price
 
     # def score(self):
     #     time_active = self.deployed_timestep - self.release_time

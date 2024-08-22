@@ -1,10 +1,43 @@
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
+import ast
+
+
 class DecisionMaker(object):
-    def __init__(self):
+    def __init__(self, datacenters, server_types, selling_prices):
+
         self.datacenters = dict()
         self.server_types = dict()
+
+        ## create all server types, a server type is a cpu generation with a specific latency sensitivity 
+        self.server_types = {s.server_generation+"_"+latency_sensitivity: Server(s.server_generation,ast.literal_eval(s.release_time),s.purchase_price, 
+                                          s.slots_size, s.energy_consumption,s.capacity,s.life_expectancy,
+                                          s.cost_of_moving,s.average_maintenance_fee, latency_sensitivity) for s in server_types.itertuples() for latency_sensitivity in ["low","medium","high"]}
+
+        ## add the selling price to the server type
+        for s in selling_prices.itertuples():
+            self.server_types[s.server_generation+"_"+s.latency_sensitivity].setSellingPrice(s.selling_price)
+
+        ## create all datacenters
+        ## only add a server type to a datacentre, if they have the same latency sensitivity
+        self.datacenters = {dc.datacenter_id: Datacenter( dc.datacenter_id,
+                                                          dc.cost_of_energy,
+                                                          dc.latency_sensitivity, 
+                                                          dc.slots_capacity,
+                                                            dict(
+                                                                filter(lambda item: item[1].latency_sensitivity == dc.latency_sensitivity, self.server_types.items())
+                                                            )) for dc in datacenters.itertuples()}
+    
+
+        
+        
+        
+        self.active_server_types = []
+
+
+
+
         self.id = 0
         self.timestep = 0
         self.solution = []

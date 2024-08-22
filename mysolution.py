@@ -14,15 +14,18 @@ from helpers.server_type import Server
 def get_my_solution(d):
     _, datacenters, servers, selling_prices = load_problem_data()
     
-    decision_maker = DecisionMaker()
+    decision_maker = DecisionMaker(datacenters,servers,selling_prices)
     
-    s = {s.server_generation: Server(s.server_generation,ast.literal_eval(s.release_time),s.purchase_price, 
-                                          s.slots_size, s.energy_consumption,s.capacity,s.life_expectancy,
-                                          s.cost_of_moving,s.average_maintenance_fee) for s in servers.itertuples()}
+    # s = {s.server_generation: Server(s.server_generation,ast.literal_eval(s.release_time),s.purchase_price, 
+    #                                       s.slots_size, s.energy_consumption,s.capacity,s.life_expectancy,
+    #                                       s.cost_of_moving,s.average_maintenance_fee) for s in servers.itertuples()}
     
-    decision_maker.server_types = s
-    decision_maker.datacenters = {dc.datacenter_id: Datacenter(dc.datacenter_id, dc.cost_of_energy, dc.latency_sensitivity, 
-                                              dc.slots_capacity, s) for dc in datacenters.itertuples()}
+    # decision_maker.server_types = s
+    # decision_maker.datacenters = {dc.datacenter_id: Datacenter(dc.datacenter_id, dc.cost_of_energy, dc.latency_sensitivity, 
+    #                                           dc.slots_capacity, s) for dc in datacenters.itertuples()}
+    
+
+
     
     # This is just a placeholder.
     return [{}]
