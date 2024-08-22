@@ -2,6 +2,7 @@ from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
 import ast
+import linear_programming
 
 
 class DecisionMaker(object):
@@ -185,6 +186,47 @@ class DecisionMaker(object):
         demands_list = [server_demands[server_type_name] for server_type_name in self.server_types.keys()]
 
         return server_sizes, demands_list, server_stock
+    
+    def getAddRemove(self, demands: list[int], datacenter: str):
+        servers = self.server_types.values().sort(key = lambda x: x.name ) 
+        actives = self.active_server_types
+
+        num_active = len([a for a in actives if a ==True ])
+
+        remaining_slots = self.datacenters[datacenter].remainingCapacity()
+        current_server_stock = [len(self.datacenters[datacenter].inventory.get(server_type, 0)) 
+                                for server_type in self.server_types]
+        server_capacities = [ s.capacity for s in self.server_types.values() ]
+
+        inequality_matrix = linear_programming.create_inequality_matrix(servers, actives )
+
+        inequality_vector = linear_programming.create_inequality_vector( 
+                                                                         remaining_slots,
+                                                                         demands,
+                                                                         current_server_stock,
+                                                                         server_capacities
+                                                                        )
+        
+        objective_vector = linear_programming.create_objective_vector(  servers,
+                                                                        actives,
+                                                                        self.datacenters[datacenter].cost_of_energy
+                                                                    )
+        
+        decision_variables = linear_programming.find_add_and_remove(inequality_matrix,inequality_vector, objective_vector)
+
+        assert len(decision_variables)== len(servers)+num_active
+
+        add = {}
+        remove = {}
+
+        for i in range(len(servers)):
+            remove[ servers[i].name ] = decision_variables[i]
+
+        for i in range(len(actives)):
+            if actives[i]:
+                add[ servers[i].name] = decision_variables[len(servers)+i ]
+
+        return add, remove
     
 
     #  #get demand for each server and timestamp
