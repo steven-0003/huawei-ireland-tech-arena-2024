@@ -136,5 +136,20 @@ class DecisionMaker(object):
         return {d: self.datacenters[d] for d in self.datacenters 
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
     
+    def getDemandCoeffs(self, datacenters: dict[str,Datacenter]) -> dict[str,float]:
+        energy_cost_sum = 0
+        remaining_capacity_sum = 0
+        for datacenter in datacenters.keys():
+            energy_cost_sum += datacenters[datacenter].cost_of_energy
+            remaining_capacity_sum += datacenters[datacenter].remaingingCapacity()
+        
+        return {d: self.calculateCoeff(datacenters[d].cost_of_energy, datacenters[d].remaingingCapacity(),
+                                       energy_cost_sum, remaining_capacity_sum) for d in datacenters.keys()}
+        
+
+    def calculateCoeff(self, energy_cost: int, remaining_capacity: int, energy_cost_sum: int, 
+                       remaining_capacity_sum: int) -> float:
+        return 1/2 * ((energy_cost/energy_cost_sum) + (remaining_capacity/remaining_capacity_sum))
+    
     def getActiveServers(self) -> None:
         self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
