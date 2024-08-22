@@ -34,5 +34,6 @@ class Datacenter(object):
                 deployed_timestep = self.inventory[server_type][i][0]
                 if cur_timestep - deployed_timestep > self.server_types[server_type].life_expectancy:
                     self.inventory[server_type].pop(i)
+                    self.inventory_level -= self.server_types[server_type].slots_size
                 else:
                     break

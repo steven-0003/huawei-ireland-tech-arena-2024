@@ -19,6 +19,9 @@ class Server(object):
     def setSellingPrice(self, new_price):
         self.selling_price = new_price
 
+    def canBeDeployed(self, cur_timestep):
+        return(cur_timestep >= self.release_time[0] and cur_timestep <= self.release_time[1])
+
     # def score(self):
     #     time_active = self.deployed_timestep - self.release_time
       
