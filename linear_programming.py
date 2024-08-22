@@ -1,8 +1,11 @@
-from typing import List
+from typing import Dict, List
+from typing import Tuple
 
 from scipy.optimize import linprog
 
 import numpy as np
+
+from helpers.server_type import Server
 
 
 def find_add_and_evict( inequality_matrix, inequality_vector, objective , decision_var_bounds ):
@@ -31,31 +34,51 @@ def find_add_and_evict( inequality_matrix, inequality_vector, objective , decisi
 
 
 
-def create_inequality_matrix(server_sizes: List[int] ):
-    ##server sizes = a listt of the slot sizes for each server    
+# def create_inequality_matrix(server_sizes_active: List[Tuple[int,bool]] , server_capacities: List[int]  ):
+def create_inequality_matrix(servers: List[Server] , actives = [bool]  ):
 
-    assert len(server_sizes)!=0 , "List of server sizes is empty" 
+
+    assert len(servers)!=0 , "List of servers is empty" 
+    assert len(servers) == len(actives) , "Length of servers does not match length of actives"
     
-    cols = len(server_sizes) * 2
-    rows = 1 + len(server_sizes)
+    active_num = len( [a for a in actives if a == True ] )
+
+    cols = len(servers) + active_num
+    rows = 1 + len(servers)
 
 
     matrix = np.zeros( (rows,cols) )
 
 
+    ## size of servers to be removed
+    for i in range(len(servers)):
+        matrix[0,i] =  -servers[i].slots_size
+
     
-    for i in range(len(server_sizes)):
-        matrix[0,2*i] =  server_sizes[i]
-        matrix[0,2*i +1] =  -server_sizes[i] 
-
-    for s in range(len(server_sizes)):
 
 
-        matrix[1+s,2*s] = 1
-        matrix[1+s,2*s+1] = -1
+    active_count = 0 
+
+    for s in range(len(servers)):
+
+        ## add capacity for servers to be removed
+        matrix[1+s,s] = -servers[s].capacity
+
+        if actives[s]: 
+
+            ## if server active add its size to first row
+            matrix[0, len(servers) + active_count] = servers[s].slots_size 
+
+            ## if server is active add its capacity 
+            matrix[1+s, len(servers)  + active_count ] = servers[s].capacity
+
+            active_count+=1
 
 
-        
+
+
+    assert active_count == active_num
+
 
 
     
@@ -66,7 +89,7 @@ def create_inequality_matrix(server_sizes: List[int] ):
     
 
 
-def create_inequality_vector(remaining_capacity: int, server_demands: List[int], server_stock:List[int]):
+def create_inequality_vector(remaining_slots: int, server_demands: List[int], server_stock:List[int], server_capacities:List[int]):
 
     ## remaining capacity = capacity left in datacenter 
     ## server_demands = list of demand for each type of server
@@ -78,12 +101,12 @@ def create_inequality_vector(remaining_capacity: int, server_demands: List[int],
     vector = np.zeros(1+len(server_demands))
 
 
-    vector[0] = remaining_capacity
+    vector[0] = remaining_slots
 
     ## for each server add the demand that is yet to be met 
     for i in range(len(server_demands)):
 
-        vector[i+1] = ( server_demands[i] - server_stock[i]   )
+        vector[i+1] = ( server_demands[i] - (server_stock[i]*server_capacities[i])   )
     
     return vector
 
@@ -91,32 +114,47 @@ def create_inequality_vector(remaining_capacity: int, server_demands: List[int],
 
 ## need to factor in cost of energy, at data centre with energy consumption of server 
 ## remember scipy minimises the objective function, so need to slip all the signs
-def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , capacities: List[int],energy_cost: float  ):
+# def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , capacities: List[int],energy_cost: float  ):
+def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_cost: float  ):
 
-    assert len(selling_prices)==len(energy_consumptions) , "Length of selling prices is not equal to the length of the energy consumptions"
+    assert len(servers)==len(actives) , "Length of selling prices is not equal to the length of the energy consumptions"
 
-
-    num_server_types = len(selling_prices)
-
-    selling_prices = np.asarray(selling_prices)
-    energy_consumptions = np.asarray(energy_consumptions)
-
-    ## amount of money made per server 
-    selling_prices *= capacities
-
-    ## amount of money lost due to energy costs, per server
-    energy_consumptions *= energy_cost
+    ## the fraction of a lifetime we expect a server to last, parameter we need to set 
+    expected_lifetime = 0.5
 
 
-    profits = selling_prices-energy_consumptions  
+    ## calculate profit for each server
+    profits = [(  
+                    (p.selling_price*p.capacity)
+                    - 
+                    (
+                        (p.energy_consumption * energy_cost)
+                           + 
+                       (p.purchase_price / (p.life_expectancy * expected_lifetime) )
+                    )
+                )
+                for p in servers
+                ]
 
-    objective_vector = np.zeros(num_server_types*2)
+    
+    active_num = len([i for i in actives if i==True])
 
-    for s in range(len(num_server_types)):
+    objective_vector = np.zeros( len(servers) + active_num )
 
-        objective_vector[2*s] = profits[s]  
-        objective_vector[2*s + 1] = -profits[s]
 
+    active_count = 0 
+    for s in range(len(servers)):
+
+        objective_vector[s] = -profits[s]
+
+        ## if server is active add expected profit of adding it 
+        if actives[s]:
+
+            objective_vector[len(servers)+active_count] = profits[s]
+            active_count+=1
+
+    assert active_num == active_count
+    
 
     return objective_vector
 
