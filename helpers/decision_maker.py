@@ -25,7 +25,19 @@ class DecisionMaker(object):
         self.timestep += 1
 
     def buyServer(self, datacenter: str, server_type: str) -> None:
-        pass
+        # check if server type exists
+        if server_type not in self.server_types:
+            raise ValueError(f"Server type '{server_type}' does not exist.")
+        
+        # check if datacenter exists
+        if datacenter not in self.datacenters:
+            raise ValueError(f"Datacenter '{datacenter}' does not exist.")
+        
+        # generate a unique ID for the new server(unless theres a id already generated/provided)
+        server_id = self.generateUniqueId()
+        
+        # buy server by calling the buy_server method from datacenter.py
+        self.datacenters[datacenter].buy_server(server_type, server_id, self.timestep)
 
     def sellServer(self, datacenter: str, server_type: str) -> None:
         pass
