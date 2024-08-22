@@ -162,3 +162,47 @@ class DecisionMaker(object):
     
     def getActiveServers(self) -> None:
         self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
+
+    # Helper function to extract relevant server data
+    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int]) -> tuple:
+        # check if datacenter exists
+        if datacenter_name not in self.datacenters:
+            raise ValueError(f"Datacenter '{datacenter_name}' does not exist.")
+        
+        # get datacenter
+        datacenter = self.datacenters[datacenter_name]
+        
+        # initialize lists to store server data
+        server_sizes = []
+        server_stock = []
+
+        # extract server data
+        for server_type_name, server_type in self.server_types.items():
+            server_sizes.append(server_type.slots_size)
+            server_stock.append(len(datacenter.inventory.get(server_type_name, [])))
+
+        # make sure demands are in the same order as the server types (dont know if we need this)
+        demands_list = [server_demands[server_type_name] for server_type_name in self.server_types.keys()]
+
+        return server_sizes, demands_list, server_stock
+    
+
+    #  #get demand for each server and timestamp
+    # servers = get_known('server_generation') 
+    # for server in servers:
+    #     high_demand = []
+    #     medium_demand = []
+    #     low_demand = []
+    #     for ts in range(1, get_known('time_steps')+1):
+    #         server_df = actual_demand.loc[(actual_demand['time_step']==ts) 
+    #                                       & (actual_demand['server_generation']==server)].copy()
+            
+    #         #There is no demand of this particular server at the current timestamp
+    #         if server_df.empty:
+    #             high_demand.append(0)
+    #             medium_demand.append(0)
+    #             low_demand.append(0)
+    #         else:
+    #             high_demand.append(server_df.iloc[0]['high'])
+    #             medium_demand.append(server_df.iloc[0]['medium'])
+    #             low_demand.append(server_df.iloc[0]['low'])
