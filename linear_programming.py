@@ -32,7 +32,7 @@ def find_add_and_evict( inequality_matrix, inequality_vector, objective , decisi
 
 
 def create_inequality_matrix(server_sizes: List[int] ):
-    
+    ##server sizes = a listt of the slot sizes for each server    
 
     assert len(server_sizes)!=0 , "List of server sizes is empty" 
     
@@ -90,6 +90,20 @@ def create_inequality_vector(remaining_capacity: int, server_demands: List[int],
 
 
 ## need to factor in cost of energy, at data centre with energy consumption of server 
-def create_objective_vector(selling_prices: List[float] , ):
-    pass
+## remember scipy minimises the objective function, so need to slip all the signs
+
+def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , energy_cost: float  ):
+
+    assert len(selling_prices)==len(energy_consumptions) , "Length of selling prices is not equal to the length of the energy consumptions"
+
+
+    selling_prices = np.asarray(selling_prices)
+    energy_consumptions = np.asarray(energy_consumptions)
+
+    energy_consumptions *= energy_cost
+
+
+    return selling_prices-energy_consumptions
+
+    
 
