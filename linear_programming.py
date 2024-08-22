@@ -91,19 +91,34 @@ def create_inequality_vector(remaining_capacity: int, server_demands: List[int],
 
 ## need to factor in cost of energy, at data centre with energy consumption of server 
 ## remember scipy minimises the objective function, so need to slip all the signs
-
-def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , energy_cost: float  ):
+def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , capacities: List[int],energy_cost: float  ):
 
     assert len(selling_prices)==len(energy_consumptions) , "Length of selling prices is not equal to the length of the energy consumptions"
 
 
+    num_server_types = len(selling_prices)
+
     selling_prices = np.asarray(selling_prices)
     energy_consumptions = np.asarray(energy_consumptions)
 
+    ## amount of money made per server 
+    selling_prices *= capacities
+
+    ## amount of money lost due to energy costs, per server
     energy_consumptions *= energy_cost
 
 
-    return selling_prices-energy_consumptions
+    profits = selling_prices-energy_consumptions  
+
+    objective_vector = np.zeros(num_server_types*2)
+
+    for s in range(len(num_server_types)):
+
+        objective_vector[2*s] = profits[s]  
+        objective_vector[2*s + 1] = -profits[s]
+
+
+    return objective_vector
 
     
 
