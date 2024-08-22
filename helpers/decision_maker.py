@@ -11,9 +11,18 @@ class DecisionMaker(object):
         self.server_types = dict()
 
         ## create all server types, a server type is a cpu generation with a specific latency sensitivity 
-        self.server_types = {s.server_generation+"_"+latency_sensitivity: Server(s.server_generation,ast.literal_eval(s.release_time),s.purchase_price, 
-                                          s.slots_size, s.energy_consumption,s.capacity,s.life_expectancy,
-                                          s.cost_of_moving,s.average_maintenance_fee, latency_sensitivity) for s in server_types.itertuples() for latency_sensitivity in ["low","medium","high"]}
+        self.server_types = {s.server_generation+"_"+latency_sensitivity: Server(
+                                                                                s.server_generation+"_"+latency_sensitivity,
+                                                                                ast.literal_eval(s.release_time),
+                                                                                s.purchase_price, 
+                                                                                s.slots_size,
+                                                                                s.energy_consumption,
+                                                                                s.capacity,
+                                                                                s.life_expectancy,
+                                                                                s.cost_of_moving,
+                                                                                s.average_maintenance_fee,
+                                                                                latency_sensitivity
+                                                                                ) for s in server_types.itertuples() for latency_sensitivity in ["low","medium","high"]}
 
         ## add the selling price to the server type
         for s in selling_prices.itertuples():
