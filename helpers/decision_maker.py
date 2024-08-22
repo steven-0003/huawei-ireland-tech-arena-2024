@@ -7,6 +7,7 @@ class DecisionMaker(object):
         self.server_types = dict()
         self.id = 0
         self.timestep = 0
+        self.solution = []
 
     def generateUniqueId(self) -> str:
         id = "server-" + str(self.id)
@@ -44,6 +45,7 @@ class DecisionMaker(object):
         
         # buy server by calling the buy_server method from datacenter.py
         self.datacenters[datacenter].buy_server(server_type, server_id, self.timestep)
+        self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "buy"))
 
     def sellServer(self, datacenter: str, server_type: str) -> None:
         # check if server type exists
@@ -56,7 +58,8 @@ class DecisionMaker(object):
         
         assert(len(self.datacenters[datacenter].inventory[server_type]) >= 1)
         
-        self.datacenters[datacenter].sell_server(server_type)
+        server_id = self.datacenters[datacenter].sell_server(server_type)
+        self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "dismiss"))
 
     def buyServers(self, datacenter: str, server_type: str, quantity: int) -> None:
         # check if server type exists
@@ -72,7 +75,9 @@ class DecisionMaker(object):
                <= self.datacenters[datacenter].slots_capacity)
         
         for _ in range(quantity):
-            self.datacenters[datacenter].buy_server(server_type, self.generateUniqueId(), self.timestep)
+            server_id = self.generateUniqueId()
+            self.datacenters[datacenter].buy_server(server_type, server_id, self.timestep)
+            self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "buy"))
 
     def sellServers(self, datacenter: str, server_type: str, quantity: int) -> None:
         # check if server type exists
@@ -86,7 +91,16 @@ class DecisionMaker(object):
         assert(len(self.datacenters[datacenter].inventory[server_type]) >= quantity)
         
         for _ in range(quantity):
-            self.datacenters[datacenter].sell_server(server_type)
+            server_id = self.datacenters[datacenter].sell_server(server_type)
+            self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "dismiss"))
 
     def checkConstraints(self, datacenter: Datacenter) -> None:
         datacenter.check_lifetime(self.timestep)
+
+    def addToSolution(self, timestep: int, datacenter: str, server_type: str, server_id: str, action: str
+                      ) -> dict:
+        return {"time_step": timestep,
+                "datacenter_id": datacenter,
+                "server_generation": server_type,
+                "server_id": server_id,
+                "action": action}
