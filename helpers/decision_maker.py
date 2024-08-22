@@ -104,3 +104,7 @@ class DecisionMaker(object):
                 "server_generation": server_type,
                 "server_id": server_id,
                 "action": action}
+    
+    def getLatencyDataCenters(self, latency_sensitivity: str) -> dict[str,Datacenter]:
+        return {d: self.datacenters[d] for d in self.datacenters 
+                if self.datacenters[d].latency_sensitivity == latency_sensitivity }

@@ -13,6 +13,9 @@ class Server(object):
         self.cost_of_moving = cost_of_moving
         self.avg_maintenance_fee = avg_maintenance_fee
 
+    def canBeDeployed(self, cur_timestep):
+        return(cur_timestep >= self.release_time[0] and cur_timestep <= self.release_time[1])
+
     # def score(self):
     #     time_active = self.deployed_timestep - self.release_time
       
