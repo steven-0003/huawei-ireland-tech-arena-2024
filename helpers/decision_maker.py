@@ -29,14 +29,7 @@ class DecisionMaker(object):
                                                                 filter(lambda item: item[1].latency_sensitivity == dc.latency_sensitivity, self.server_types.items())
                                                             )) for dc in datacenters.itertuples()}
     
-
-        
-        
-        
         self.active_server_types = []
-
-
-
 
         self.id = 0
         self.timestep = 0
@@ -58,6 +51,7 @@ class DecisionMaker(object):
     def step(self):
         self.timestep += 1
 
+        self.getActiveServers()
         for datacenter in self.datacenters.keys():
             self.checkConstraints(self.datacenters[datacenter])
 
@@ -141,3 +135,6 @@ class DecisionMaker(object):
     def getLatencyDataCenters(self, latency_sensitivity: str) -> dict[str,Datacenter]:
         return {d: self.datacenters[d] for d in self.datacenters 
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
+    
+    def getActiveServers(self) -> None:
+        self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
