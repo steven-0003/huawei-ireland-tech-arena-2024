@@ -78,6 +78,7 @@ class Datacenter(object):
 
         assert len(decision_variables)== len(servers)+num_active
 
+        ## dictionaries containing server names, and how much of that server to remove
         add = {}
         remove = {}
 
