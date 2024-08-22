@@ -37,3 +37,6 @@ class Datacenter(object):
                     self.inventory_level -= self.server_types[server_type].slots_size
                 else:
                     break
+
+    def remainingCapacity(self) -> int:
+        return self.slots_capacity - self.inventory_level
