@@ -134,7 +134,7 @@ class DecisionMaker(object):
                       ) -> dict:
         return {"time_step": timestep,
                 "datacenter_id": datacenter,
-                "server_generation": server_type,
+                "server_generation": server_type.split('_')[0],
                 "server_id": server_id,
                 "action": action}
     
