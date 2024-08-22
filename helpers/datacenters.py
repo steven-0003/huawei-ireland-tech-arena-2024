@@ -14,17 +14,19 @@ class Datacenter(object):
 
     def buy_server(self, server_type: str, id: str, timestep: int) -> None:
         assert(server_type in self.server_types.keys())
-        assert(self.inventory_level + self.server_types[server_type].slots_size <= self.slots_capacity)
         
+        if server_type not in self.inventory:
+            self.inventory[server_type] = []
+
         self.inventory[server_type].append([timestep,id])
         self.inventory_level += self.server_types[server_type].slots_size
 
-    def sell_server(self, server_type: str) -> None:
+    def sell_server(self, server_type: str) -> str:
         assert(server_type in self.server_types.keys())
-        assert(self.inventory_level > 0)
+        assert(server_type in self.inventory.keys())
 
-        self.inventory[server_type].pop(0)
         self.inventory_level -= self.server_types[server_type].slots_size
+        return self.inventory[server_type].pop(0)[1]
     
     def check_lifetime(self, cur_timestep: int) -> None:
         for server_type in self.inventory.keys():
