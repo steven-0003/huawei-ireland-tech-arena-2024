@@ -165,7 +165,7 @@ class DecisionMaker(object):
         self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
 
     # Helper function to extract relevant server data
-    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int]) -> tuple:
+    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int], ls: str) -> tuple:
         # check if datacenter exists
         if datacenter_name not in self.datacenters:
             raise ValueError(f"Datacenter '{datacenter_name}' does not exist.")
@@ -179,11 +179,15 @@ class DecisionMaker(object):
 
         # extract server data
         for server_type_name, server_type in self.server_types.items():
+            if server_type_name.split('_')[1] != ls:
+                continue
+
             server_sizes.append(server_type.slots_size)
             server_stock.append(len(datacenter.inventory.get(server_type_name, [])))
 
         # make sure demands are in the same order as the server types (dont know if we need this)
-        demands_list = [server_demands[server_type_name] for server_type_name in self.server_types.keys()]
+        demands_list = [server_demands[server_type_name] for server_type_name in self.server_types.keys()
+                        if server_type_name.split('_')[1] == ls]
 
         return server_sizes, demands_list, server_stock
     
