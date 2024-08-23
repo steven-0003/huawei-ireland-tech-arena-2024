@@ -99,7 +99,7 @@ def check_server_usage_by_release_time(solution):
     # CHECK THAT ONLY THE SERVERS AVAILABLE FOR PURCHASE AT A CERTAIN TIME-STEP
     # ARE USED AT THAT TIME-STEP
     solution['rt_is_fine'] = solution.apply(check_release_time, axis=1)
-    solution = solution[solution['rt_is_fine']]
+    solution = solution[(solution['rt_is_fine'] != 'buy') | solution['rt_is_fine']]
     solution = solution.drop(columns='rt_is_fine', inplace=False)
     return solution
 
