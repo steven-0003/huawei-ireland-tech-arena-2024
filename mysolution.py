@@ -45,7 +45,7 @@ def get_my_solution(d):
             
             for dc in dcs.keys():
                 coeffs = decision_maker.getDemandCoeffs(dcs)
-                server_sizes, demands_list, server_stock = decision_maker.extractRelevantData(dc,server_demands,latency_sensitivity,
+                server_sizes, demands_list, server_stock = decision_maker.extractRelevantData(dc,server_demands,
                                                                                               coeffs[dc])
                 to_add, to_remove = decision_maker.getAddRemove(demands_list, dc)
                 
