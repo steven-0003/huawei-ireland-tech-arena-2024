@@ -220,6 +220,55 @@ class DecisionMaker(object):
 
         return add, remove
     
+    
+    def calculate_normalized_lifespan(datacenter):
+        total_servers = 0
+        lifespan_sum = 0
+
+        for server_type, server in datacenter.server_types.items():
+
+            #retrieve the list of operating times for all servers of this type in the datacenter
+            servers = datacenter.inventory[server_type]
+
+            for deployed_time in servers:
+                total_servers += 1
+                
+                #add the ratio of the server's operating time to its life expectancy to sum
+                lifespan_sum += deployed_time / server.life_expectancy
+
+        #calculate the normalized lifespan (L) as the average ratio across all servers
+        return lifespan_sum / total_servers if total_servers > 0 else 0 # If there are no servers, return 0 to avoid division by zero
+    
+
+    def calculate_utilization(datacenter, demand, failure_rate):
+        total_pairs = 0
+        utilization_sum = 0
+
+        for (latency_sensitivity, server_generation), demand_values in demand.items():
+            
+            server_type = datacenter.server_types[server_generation]
+            capacity = server_type.capacity
+
+            #adjust capacity for server failure rate
+            adjusted_capacity = (1 - failure_rate) * capacity
+
+            #calculate utilization for each time step in the demand values
+            for demand_value in demand_values:
+                #calculate met demand as the minimum of adjusted capacity and demand value
+                met_demand = min(adjusted_capacity, demand_value)
+
+                #calculate utilization ratio for this time step
+                utilization_ratio = met_demand / adjusted_capacity
+
+                #add utilization ratio to the total sum
+                utilization_sum += utilization_ratio
+
+                total_pairs += 1
+
+        # calculate average utilization U
+        return utilization_sum / total_pairs if total_pairs > 0 else 0 # If there are no pairs, return 0 to avoid division by zero.
+
+    
 
     #  #get demand for each server and timestamp
     # servers = get_known('server_generation') 
