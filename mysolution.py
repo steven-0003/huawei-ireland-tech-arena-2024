@@ -36,7 +36,7 @@ def get_my_solution(d):
             server_demands = {}
             for s in decision_maker.server_types.keys():
                 if s.split('_')[1] != latency_sensitivity:
-                    continue
+                    server_demands[s] = 0
                 server_demand_df = ts_demand.loc[(ts_demand['server_generation']==s.split('_')[0])].copy()
                 if server_demand_df.empty:
                     server_demands[s] = 0
@@ -44,9 +44,11 @@ def get_my_solution(d):
                     server_demands[s] = server_demand_df.iloc[0][latency_sensitivity]
             
             for dc in dcs.keys():
-                print(server_demands)
-                server_sizes, demands_list, server_stock = decision_maker.extractRelevantData(dc,server_demands,latency_sensitivity)
-                print(demands_list)
+                coeffs = decision_maker.getDemandCoeffs(dcs)
+                server_sizes, demands_list, server_stock = decision_maker.extractRelevantData(dc,server_demands,latency_sensitivity,
+                                                                                              coeffs[dc])
+                to_add, to_remove = decision_maker.getAddRemove(demands_list, dc)
+                
                 
     return decision_maker.solution
 

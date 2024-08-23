@@ -165,7 +165,7 @@ class DecisionMaker(object):
         self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
 
     # Helper function to extract relevant server data
-    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int], ls: str) -> tuple:
+    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int], coeff: float) -> tuple:
         # check if datacenter exists
         if datacenter_name not in self.datacenters:
             raise ValueError(f"Datacenter '{datacenter_name}' does not exist.")
@@ -179,26 +179,23 @@ class DecisionMaker(object):
 
         # extract server data
         for server_type_name, server_type in self.server_types.items():
-            if server_type_name.split('_')[1] != ls:
-                continue
-
             server_sizes.append(server_type.slots_size)
             server_stock.append(len(datacenter.inventory.get(server_type_name, [])))
 
         # make sure demands are in the same order as the server types (dont know if we need this)
-        demands_list = [server_demands[server_type_name] for server_type_name in self.server_types.keys()
-                        if server_type_name.split('_')[1] == ls]
+        demands_list = [int(server_demands[server_type_name]*coeff) for server_type_name in self.server_types.keys()]
 
         return server_sizes, demands_list, server_stock
     
     def getAddRemove(self, demands: list[int], datacenter: str):
-        servers = self.server_types.values().sort(key = lambda x: x.name ) 
-        actives = self.active_server_types
+        #servers = self.server_types.values().sort(key = lambda x: x.name ) 
+        servers = list(self.server_types.values())
+        actives = [server.canBeDeployed(self.timestep) for server in servers]
 
         num_active = len([a for a in actives if a ==True ])
 
         remaining_slots = self.datacenters[datacenter].remainingCapacity()
-        current_server_stock = [len(self.datacenters[datacenter].inventory.get(server_type, 0)) 
+        current_server_stock = [len(self.datacenters[datacenter].inventory.get(server_type, [])) 
                                 for server_type in self.server_types]
         server_capacities = [ s.capacity for s in self.server_types.values() ]
 
@@ -216,7 +213,7 @@ class DecisionMaker(object):
                                                                         self.datacenters[datacenter].cost_of_energy
                                                                     )
         
-        decision_variables = linear_programming.find_add_and_remove(inequality_matrix,inequality_vector, objective_vector)
+        decision_variables = linear_programming.find_add_and_evict(inequality_matrix,inequality_vector, objective_vector)
 
         assert len(decision_variables)== len(servers)+num_active
 
