@@ -10,7 +10,7 @@ class Datacenter(object):
         self.slots_capacity = slots_capacity
 
         self.server_types = server_types
-        self.inventory = {}
+        self.inventory = {s : [] for s in server_types.keys()}
         self.inventory_level = 0
 
     def buy_server(self, server_type: str, id: str, timestep: int) -> None:
@@ -41,6 +41,19 @@ class Datacenter(object):
 
     def remainingCapacity(self) -> int:
         return self.slots_capacity - self.inventory_level
+    
+    def getBounds(self, demand: List[int], servers: List[Server], actives: List[bool]) -> List[tuple]:
+        bounds = []
+        for i in range(len(servers)):
+            bounds.append((0,len(self.inventory.get(servers[i].name, []))))
+        
+        activeCount = 0
+        for i in range(len(servers)):
+            if actives[i]:
+                bounds.append((0,demand[i]//servers[i].capacity))
+
+        return bounds
+
     
 
     # def getAddRemove(self, dm: DecisionMaker, demands):

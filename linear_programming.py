@@ -156,7 +156,7 @@ def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_
     assert active_num == active_count
     
 
-    return objective_vector
+    return -objective_vector
 
     
 

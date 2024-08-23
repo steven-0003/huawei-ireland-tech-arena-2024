@@ -1,17 +1,14 @@
 
-import ast
+import math
 import numpy as np
 import pandas as pd
 from seeds import known_seeds
 from utils import save_solution
 from utils import load_problem_data
 from evaluation import get_known
-from evaluation import get_time_step_demand
 from evaluation import get_actual_demand
 
 from helpers.decision_maker import DecisionMaker
-from helpers.datacenters import Datacenter
-from helpers.server_type import Server
 
 def get_my_solution(d):
     _, datacenters, servers, selling_prices = load_problem_data()
@@ -36,7 +33,7 @@ def get_my_solution(d):
             server_demands = {}
             for s in decision_maker.server_types.keys():
                 if s.split('_')[1] != latency_sensitivity:
-                    server_demands[s] = 0
+                    continue
                 server_demand_df = ts_demand.loc[(ts_demand['server_generation']==s.split('_')[0])].copy()
                 if server_demand_df.empty:
                     server_demands[s] = 0
@@ -45,9 +42,20 @@ def get_my_solution(d):
             
             for dc in dcs.keys():
                 coeffs = decision_maker.getDemandCoeffs(dcs)
-                server_sizes, demands_list, server_stock = decision_maker.extractRelevantData(dc,server_demands,
-                                                                                              coeffs[dc])
-                to_add, to_remove = decision_maker.getAddRemove(demands_list, dc)
+                demands_list = decision_maker.extractRelevantData(dc,server_demands, latency_sensitivity
+                                                                                              ,coeffs[dc])
+                to_add, to_remove = decision_maker.getAddRemove(demands_list, dc, latency_sensitivity)
+                
+                
+                for serv_remove in to_remove.keys():
+                    if math.ceil(to_remove[serv_remove]) == 0:
+                        continue
+                    decision_maker.sellServers(dc,serv_remove,math.ceil(to_remove[serv_remove]))
+
+                for serv_add in to_add.keys():
+                    if int(to_add[serv_add]) == 0:
+                        continue
+                    decision_maker.buyServers(dc,serv_add,int(to_add[serv_add]))
                 
                 
     return decision_maker.solution

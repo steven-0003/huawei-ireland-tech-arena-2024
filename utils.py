@@ -10,7 +10,7 @@ def load_json(path):
 
 
 def save_json(path, data):
-    with open(path, 'w', encoding='utf-8') as out:
+    with open(path, 'w+', encoding='utf-8') as out:
         json.dump(data, out, ensure_ascii=False, indent=4)
 
 
