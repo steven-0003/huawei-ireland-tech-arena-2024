@@ -156,9 +156,12 @@ class DecisionMaker(object):
 
     def calculateCoeff(self, energy_cost: int, remaining_capacity: int, energy_cost_sum: int, 
                        remaining_capacity_sum: int) -> float:
+        energy_frac = (energy_cost/energy_cost_sum)
+        if energy_frac != 1:
+            energy_frac = 1 - energy_frac
         if remaining_capacity_sum == 0:
-            return 1/2 * (energy_cost/energy_cost_sum)
-        return 1/2 * ((energy_cost/energy_cost_sum) + (remaining_capacity/remaining_capacity_sum))
+            return energy_frac
+        return 1/2 * (energy_frac + (remaining_capacity/remaining_capacity_sum))
     
     def getActiveServers(self) -> None:
         self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
