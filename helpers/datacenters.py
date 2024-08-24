@@ -1,5 +1,6 @@
 from typing import List
 from helpers.server_type import Server
+import linear_programming
 
 class Datacenter(object):
     def __init__(self, name: str, cost_of_energy: float, latency_sensitivity: str, slots_capacity: int, 
@@ -10,8 +11,14 @@ class Datacenter(object):
         self.slots_capacity = slots_capacity
 
         self.server_types = server_types
+        ## do we need a dict for server types, could this be a list 
+        # self.server_types.sort(key= lambda x: x.name ) ## sort alphabetically to ensure consistent order
+
         self.inventory = {s : [] for s in server_types.keys()}
         self.inventory_level = 0
+
+        self.adding_servers = {}
+        self.removing_servers = {}
 
     def buy_server(self, server_type: str, id: str, timestep: int) -> None:
         assert(server_type in self.server_types.keys())
@@ -43,6 +50,10 @@ class Datacenter(object):
         return self.slots_capacity - self.inventory_level
     
     def getBounds(self, demand: List[int], servers: List[Server], actives: List[bool]) -> List[tuple]:
+
+        ## could this function potentially remove the servers parameter, and use the server_types in this class
+        ## if this is done we just have to watch out that this uses the same ordering as used in getAddRemove()
+
         bounds = []
         for i in range(len(servers)):
             bounds.append((0,len(self.inventory.get(servers[i].name, []))))
@@ -53,77 +64,92 @@ class Datacenter(object):
                 bounds.append((0,demand[i]//servers[i].capacity))
 
         return bounds
-
     
 
-    # def getAddRemove(self, dm: DecisionMaker, demands):
 
-
-    #     servers = self.server_types.values().sort(key = lambda x: x.name ) 
-    #     actives = self.getActiveServers(dm, servers)
-
-    #     num_active = len([a for a in actives if a ==True ])
+    ## timestep = the current timestep
+    ## actives = a list of true or false, true where the corrresponding server is active,
+    ## this assumes the servers are sorted alphabetically
+    ## demands = a dictionary of server types to demand 
+    def find_add_remove(self, timestep , demands):
         
-    #     ## need to figure out how to calculate
-    #     remaining_slots = self.remainingCapacity()
-    #     current_server_stock = [len(self.inventory.get(server_type, 0)) for server_type in self.server_types]
-    #     server_capacities = [ s.capacity for s in self.server_types.values() ]
+        
+        
+        for server in self.server_types:
+            
+            
+            # self.adding_servers, self.removing_servers = self.getAddRemove(demands, )
+            
+            pass
 
-    #     inequality_matrix = linear_programming.create_inequality_matrix(servers, actives )
 
 
-    #     inequality_vector = linear_programming.create_inequality_vector( 
-    #                                                                      remaining_slots,
-    #                                                                      demands,
-    #                                                                      current_server_stock,
-    #                                                                      server_capacities
-    #                                                                     )
 
-    #     objective_vector = linear_programming.create_objective_vector(  servers,
-    #                                                                     actives,
-    #                                                                     self.cost_of_energy
-    #                                                                 )
+            ## find add and remove 
+
+
+
+
+
+    def getAddRemove(self, demands: list[int]):
+
+        servers = self.server_types.values()
+        servers.sort(key = lambda x: x.name )
+
+        actives = [server.canBeDeployed(self.timestep) for server in servers]
+
+        num_active = len([a for a in actives if a ==True ])
+
+        remaining_slots = self.remainingCapacity()
+        current_server_stock = [ len(self.inventory.get(server_type.name, [])) for server_type in self.server_types]
+
+        server_capacities = [ s.capacity for s in servers ]
+
+        inequality_matrix = linear_programming.create_inequality_matrix(servers, actives )
+
+        inequality_vector = linear_programming.create_inequality_vector( 
+                                                                            remaining_slots,
+                                                                            demands,
+                                                                            current_server_stock,
+                                                                            server_capacities
+                                                                        )
+        
+        objective_vector = linear_programming.create_objective_vector(  servers,
+                                                                        actives,
+                                                                        self.cost_of_energy
+                                                                    )
+        
+        decision_variables = linear_programming.find_add_and_evict( inequality_matrix,
+                                                                    inequality_vector,
+                                                                    objective_vector,
+                                                                    self.getBounds(demands, servers,actives)
+                                                                )
         
 
-    #     decision_variables = linear_programming.find_add_and_remove(inequality_matrix,inequality_vector, objective_vector)
+        assert len(decision_variables)== len(servers)+num_active
 
-    #     assert len(decision_variables)== len(servers)+num_active
+        add = {}
+        remove = {}
 
-    #     add = {}
-    #     remove = {}
+        for i in range(len(servers)):
+            remove[ servers[i].name ] = decision_variables[i]
 
-    #     for i in range(len(servers)):
+        activeCount = 0
+        for i in range(len(actives)):
+            if actives[i]:
+                add[ servers[i].name] = decision_variables[len(servers)+activeCount]
+                activeCount += 1
 
-    #         remove[ servers[i].name ] = decision_variables[i]
-
-    #     for i in range(len(actives)):
-
-    #         if actives[i]:
-    #             add[ servers[i].name] = decision_variables[len(servers)+i ]
-
-
-    #     return add, remove
-
-        
+        return add, remove
 
 
-    # ## returns a list of bool, indicating which servers are active
-    # def getActiveServers(self,dm:DecisionMaker, servers:List[Server]) -> List[bool]:
-
-
-    #     all_active_servers = dm.active_server_types()
-
-
-    #     active_servers = []
-
-
-    #     for i in servers:
-    #         if i.name in all_active_servers:
-    #             active_servers.append(True)
-    #         else:
-    #             active_servers.append(False)
+            
 
         
-    #     assert len(servers) == len(active_servers) 
 
-    #     return active_servers
+
+
+
+
+
+

@@ -221,6 +221,10 @@ class DecisionMaker(object):
         return add, remove
     
     
+
+
+
+    
     def calculate_normalized_lifespan(datacenter):
         total_servers = 0
         lifespan_sum = 0
