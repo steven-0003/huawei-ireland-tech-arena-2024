@@ -106,7 +106,7 @@ def create_inequality_vector(remaining_slots: int, server_demands: List[int], se
     ## for each server add the demand that is yet to be met 
     for i in range(len(server_demands)):
 
-        vector[i+1] = ( server_demands[i] - (server_stock[i]*server_capacities[i])   )
+        vector[i+1] = ( (server_demands[i]*0.9) - (server_stock[i]*server_capacities[i])   )
     
     return vector
 
@@ -120,7 +120,7 @@ def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_
     assert len(servers)==len(actives) , "Length of selling prices is not equal to the length of the energy consumptions"
 
     ## the fraction of a lifetime we expect a server to last, parameter we need to set 
-    expected_lifetime = 0.5
+    expected_lifetime = 0.7
 
 
     ## calculate profit for each server
@@ -150,7 +150,7 @@ def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_
         ## if server is active add expected profit of adding it 
         if actives[s]:
 
-            objective_vector[len(servers)+active_count] = profits[s]
+            objective_vector[len(servers)+active_count] = profits[s] * 0.2
             active_count+=1
 
     assert active_num == active_count
