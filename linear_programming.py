@@ -10,12 +10,8 @@ from helpers.server_type import Server
 
 def find_add_and_evict( inequality_matrix, inequality_vector, objective , decision_var_bounds ):
 
-    ## decision_var_bounds = range that the decision variables taken 
-    ## provided in this order,  [
-    ##                           server1_add, server1_evict,
-    ##                           server2_add, server2_evict 
-    ##                           ...
-    ##                          ]
+    ## decision_var_bounds = range that the decision variables taken, is a tuple of (start_range, end_range)
+    ## provided in this order,  ranges for all remove variables are griven first, and then the ranges for all add variables
     
 
     ## solve problem 
@@ -103,19 +99,19 @@ def create_inequality_vector(remaining_slots: int, server_demands: List[int], se
 
     vector[0] = remaining_slots
 
+    demand_to_meet = 1.0
+
     ## for each server add the demand that is yet to be met 
     for i in range(len(server_demands)):
 
-        vector[i+1] = ( (server_demands[i]*0.9) - (server_stock[i]*server_capacities[i])   )
+        vector[i+1] = ( (server_demands[i]*demand_to_meet) - (server_stock[i]*server_capacities[i])   )
     
     return vector
 
 
 
-## need to factor in cost of energy, at data centre with energy consumption of server 
-## remember scipy minimises the objective function, so need to slip all the signs
-# def create_objective_vector(selling_prices: List[float] , energy_consumptions: List[float] , capacities: List[int],energy_cost: float  ):
-def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_cost: float  ):
+
+def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_cost: float , latency_sensitivity:str ):
 
     assert len(servers)==len(actives) , "Length of selling prices is not equal to the length of the energy consumptions"
 
@@ -125,7 +121,7 @@ def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_
 
     ## calculate profit for each server
     profits = [(  
-                    (p.selling_price*p.capacity)
+                    (p.selling_prices[latency_sensitivity] *p.capacity)
                     - 
                     (
                         (p.energy_consumption * energy_cost)

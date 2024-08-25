@@ -1,3 +1,7 @@
+import math
+from typing import List
+import pandas as pd
+from evaluation import get_known
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
@@ -6,40 +10,20 @@ import linear_programming
 
 
 class DecisionMaker(object):
-    def __init__(self, datacenters, server_types, selling_prices):
+
+
+
+
+    
+    def __init__(self, datacenters, server_types, selling_prices, demand ):
 
         self.datacenters = dict()
         self.server_types = dict()
 
-        ## create all server types, a server type is a cpu generation with a specific latency sensitivity 
-        self.server_types = {s.server_generation+"_"+latency_sensitivity: Server(
-                                                                                s.server_generation+"_"+latency_sensitivity,
-                                                                                ast.literal_eval(s.release_time),
-                                                                                s.purchase_price, 
-                                                                                s.slots_size,
-                                                                                s.energy_consumption,
-                                                                                s.capacity,
-                                                                                s.life_expectancy,
-                                                                                s.cost_of_moving,
-                                                                                s.average_maintenance_fee,
-                                                                                latency_sensitivity
-                                                                                ) for s in server_types.itertuples() for latency_sensitivity in ["low","medium","high"]}
+        self.setServerTypes(server_types, selling_prices)        
+        self.setDataCenters(datacenters)
 
-        ## add the selling price to the server type
-        for s in selling_prices.itertuples():
-            self.server_types[s.server_generation+"_"+s.latency_sensitivity].setSellingPrice(s.selling_price)
-
-        ## create all datacenters
-        ## only add a server type to a datacentre, if they have the same latency sensitivity
-        self.datacenters = {dc.datacenter_id: Datacenter( dc.datacenter_id,
-                                                          dc.cost_of_energy,
-                                                          dc.latency_sensitivity, 
-                                                          dc.slots_capacity,
-                                                            dict(
-                                                                filter(lambda item: item[1].latency_sensitivity == dc.latency_sensitivity, self.server_types.items())
-                                                            )) for dc in datacenters.itertuples()}
-    
-        self.active_server_types = []
+        self.demand = demand
 
         self.id = 0
         self.timestep = 0
@@ -50,53 +34,57 @@ class DecisionMaker(object):
         self.id += 1
         return id
     
-    def addDataCenters(self, datacenters: list[Datacenter]) -> None:
-        for datacenter in datacenters:
-            self.datacenters[datacenter.name] = datacenter
+    def setDataCenters(self, datacenters) -> None:
 
-    def addServerTypes(self, server_types: list[Server]) -> None:
-        for server_type in server_types:
-            self.server_types[server_type.name] = server_type
+        ## create all datacenters
+        ## only add a server type to a datacentre, if they have the same latency sensitivity
+        self.datacenters = {dc.datacenter_id: Datacenter( dc.datacenter_id,
+                                                          dc.cost_of_energy,
+                                                          dc.latency_sensitivity, 
+                                                          dc.slots_capacity,
+                                                            # dict(
+                                                            #     filter(lambda item: item[1].latency_sensitivity == dc.latency_sensitivity, self.server_types.items())
+                                                            # )
+                                                            self.server_types
+                                                        ) for dc in datacenters.itertuples()}
+    
 
-    def step(self):
-        self.timestep += 1
+    def setServerTypes(self, server_types, selling_prices) -> None:
 
-        self.getActiveServers()
-        for datacenter in self.datacenters.keys():
-            self.checkConstraints(self.datacenters[datacenter])
+        self.server_types = {s.server_generation: Server(
+                                                                                        s.server_generation,
+                                                                                        ast.literal_eval(s.release_time),
+                                                                                        s.purchase_price, 
+                                                                                        s.slots_size,
+                                                                                        s.energy_consumption,
+                                                                                        s.capacity,
+                                                                                        s.life_expectancy,
+                                                                                        s.cost_of_moving,
+                                                                                        s.average_maintenance_fee,
+                                                                                        
+                                                                                        ) for s in server_types.itertuples() }
 
-    def buyServer(self, datacenter: str, server_type: str) -> None:
-        # check if server type exists
-        if server_type not in self.server_types:
-            raise ValueError(f"Server type '{server_type}' does not exist.")
-        
-        # check if datacenter exists
-        if datacenter not in self.datacenters:
-            raise ValueError(f"Datacenter '{datacenter}' does not exist.")
-        
-        assert(self.datacenters[datacenter].inventory_level + self.server_types[server_type].slots_size
-               <= self.datacenters[datacenter].slots_capacity)
-        
-        # generate a unique ID for the new server(unless theres a id already generated/provided)
-        server_id = self.generateUniqueId()
-        
-        # buy server by calling the buy_server method from datacenter.py
-        self.datacenters[datacenter].buy_server(server_type, server_id, self.timestep)
-        self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "buy"))
 
-    def sellServer(self, datacenter: str, server_type: str) -> None:
-        # check if server type exists
-        if server_type not in self.server_types:
-            raise ValueError(f"Server type '{server_type}' does not exist.")
+
+        ## add the selling prices to the server type
+        for server in self.server_types.values():
+            
+            selling_prices_for_server = selling_prices.loc[(selling_prices["server_generation"]==server.name)]
+
+            ## set selling prices for server as a dictionary 
+            ## that maps the latency to that servers selling price at that latency 
+            server.setSellingPrices( pd.Series( 
+                                                selling_prices_for_server.selling_price.values,
+                                                index =selling_prices_for_server.latency_sensitivity
+                                            ).to_dict()
+                                    )
         
-        # check if datacenter exists
-        if datacenter not in self.datacenters:
-            raise ValueError(f"Datacenter '{datacenter}' does not exist.")
         
-        assert(len(self.datacenters[datacenter].inventory[server_type]) >= 1)
         
-        server_id = self.datacenters[datacenter].sell_server(server_type)
-        self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "dismiss"))
+        
+        
+
+    
 
     def buyServers(self, datacenter: str, server_type: str, quantity: int) -> None:
         # check if server type exists
@@ -104,18 +92,18 @@ class DecisionMaker(object):
             raise ValueError(f"Server type '{server_type}' does not exist.")
         
         # check if datacenter exists
-        if datacenter not in self.datacenters:
-            raise ValueError(f"Datacenter '{datacenter}' does not exist.")
+        if datacenter.name not in self.datacenters:
+            raise ValueError(f"Datacenter '{datacenter.name}' does not exist.")
         
-        assert(quantity>0)
-        assert(self.datacenters[datacenter].inventory_level + (self.server_types[server_type].slots_size * quantity)
-               <= self.datacenters[datacenter].slots_capacity)
+        
+        assert(datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)
+               <= datacenter.slots_capacity)
 
         for _ in range(quantity):
             server_id = self.generateUniqueId()
-            self.datacenters[datacenter].buy_server(server_type, server_id, self.timestep)
+            datacenter.buy_server(server_type, server_id, self.timestep)
             
-            self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "buy"))
+            self.addToSolution(self.timestep, datacenter.name, server_type, server_id, "buy")
 
     def sellServers(self, datacenter: str, server_type: str, quantity: int) -> None:
         # check if server type exists
@@ -123,35 +111,60 @@ class DecisionMaker(object):
             raise ValueError(f"Server type '{server_type}' does not exist.")
         
         # check if datacenter exists
-        if datacenter not in self.datacenters:
-            raise ValueError(f"Datacenter '{datacenter}' does not exist.")
+        if datacenter.name not in self.datacenters:
+            raise ValueError(f"Datacenter '{datacenter.name}' does not exist.")
         
-        assert(len(self.datacenters[datacenter].inventory[server_type]) >= quantity)
+        assert(len(datacenter.inventory[server_type]) >= quantity)
         
         for _ in range(quantity):
-            server_id = self.datacenters[datacenter].sell_server(server_type)
-            self.solution.append(self.addToSolution(self.timestep, datacenter, server_type, server_id, "dismiss"))
+            server_id = datacenter.sell_server(server_type)
+            self.addToSolution(self.timestep, datacenter.name, server_type, server_id, "dismiss")
 
-    def checkConstraints(self, datacenter: Datacenter) -> None:
-        datacenter.check_lifetime(self.timestep)
+    def checkConstraints(self) -> None:
 
-    def addToSolution(self, timestep: int, datacenter: str, server_type: str, server_id: str, action: str
-                      ) -> dict:
-        return {"time_step": timestep, "datacenter_id": datacenter, "server_generation": server_type.split('_')[0], "server_id": server_id, "action": action}
+        ## check whether a datacenter contains servers that exceed their lifetime 
+        for datacenter in self.datacenters.values():
+            datacenter.check_lifetime(self.timestep)
+
+
+    ## adds a transaction to the solution 
+    ## returns true if succesful
+    def addToSolution(self, timestep: int, datacenter: str, server_type: str, server_id : str,  action: str) -> bool:
+        
+        transaction = {
+                        "time_step": timestep,
+                        "datacenter_id": datacenter,
+                        "server_generation": server_type,
+                        "server_id": server_id,
+                        "action": action
+                        }
+        
+     
+        
+        self.solution.append(transaction)
+        return True 
     
+
     def getLatencyDataCenters(self, latency_sensitivity: str) -> dict[str,Datacenter]:
         return {d: self.datacenters[d] for d in self.datacenters 
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
     
-    def getDemandCoeffs(self, datacenters: dict[str,Datacenter]) -> dict[str,float]:
+    
+    
+    def getDemandCoeffs(self, datacenters: List[Datacenter]) -> dict[str,float]:
         energy_cost_sum = 0
         remaining_capacity_sum = 0
-        for datacenter in datacenters.keys():
-            energy_cost_sum += datacenters[datacenter].cost_of_energy
-            remaining_capacity_sum += datacenters[datacenter].remainingCapacity()
+        for datacenter in datacenters:
+            energy_cost_sum += datacenter.cost_of_energy
+            remaining_capacity_sum += datacenter.remainingCapacity()
         
-        return {d: self.calculateCoeff(datacenters[d].cost_of_energy, datacenters[d].remainingCapacity(),
-                                       energy_cost_sum, remaining_capacity_sum) for d in datacenters.keys()}
+        return {d.name: self.calculateCoeff( d.cost_of_energy,
+                                        d.remainingCapacity(),
+                                        energy_cost_sum,
+                                        remaining_capacity_sum
+                                    )
+                                        for d in datacenters
+                                }
         
 
     def calculateCoeff(self, energy_cost: int, remaining_capacity: int, energy_cost_sum: int, 
@@ -163,67 +176,136 @@ class DecisionMaker(object):
             return energy_frac
         return 1/2 * (energy_frac + (remaining_capacity/remaining_capacity_sum))
     
-    def getActiveServers(self) -> None:
-        self.active_server_types = [server for server in self.server_types.keys() if self.server_types[server].canBeDeployed(self.timestep)]
+    """ 
+        returns ALL  of the demand coeffecients as a nested dictionary 
+        first dictionary points to the latency_sensitivity of datacenters
+        second dictionary is the coefficient for how much of the demand should go to that dictionary 
 
-    # Helper function to extract relevant server data
-    def extractRelevantData(self, datacenter_name: str, server_demands: dict[str, int], ls: str, coeff: float) -> list[int]:
-        # check if datacenter exists
-        if datacenter_name not in self.datacenters:
-            raise ValueError(f"Datacenter '{datacenter_name}' does not exist.")
-        
-        # make sure demands are in the same order as the server types (dont know if we need this)
-        demands_list = [int(server_demands[server_type_name]*coeff) for server_type_name in self.server_types.keys()
-                        if server_type_name.split("_")[1] == ls]
+        e.g. coefficients["low"]   , will return a dictionary which maps "low" datacentres to their respective cofficients
+        e.g. coefficients["low"]["DC1"] will return the coefficient for D   
+        TODO: it may be worth testing that for coefficients[latency_sensitivity] all the coefficients add up to 1
+    """
+    def get_all_demand_coefficients(self):
 
-        return demands_list
+        demand_coefficients = {}
+        for latency_sensitivity in get_known('latency_sensitivity'):
+                
+            ## gets all datacenters with this latency 
+            datacenters_with_latency = [dc for dc in self.datacenters.values() if dc.latency_sensitivity == latency_sensitivity]
+                
+            demand_coefficients[latency_sensitivity] = self.getDemandCoeffs(datacenters_with_latency) 
+
+        return demand_coefficients
     
-    def getAddRemove(self, demands: list[int], datacenter: str, ls: str):
-        servers = [s for s in self.server_types.values() if s.latency_sensitivity == ls]
-        servers.sort(key = lambda x: x.name )
-        actives = [server.canBeDeployed(self.timestep) for server in servers]
 
-        num_active = len([a for a in actives if a ==True ])
+    """
+     Processes the demand from the csv
+    """
+    def processDemand(self):
 
-        remaining_slots = self.datacenters[datacenter].remainingCapacity()
-        current_server_stock = [len(self.datacenters[datacenter].inventory.get(server_type.name, [])) 
-                                for server_type in servers]
+        demands = {}
 
-        server_capacities = [ s.capacity for s in servers ]
+        for latency_sensitivity in get_known('latency_sensitivity'):
 
-        inequality_matrix = linear_programming.create_inequality_matrix(servers, actives )
+                    ## get all data centers for this latency  
+                    dcs = self.getLatencyDataCenters(latency_sensitivity)
+                    
+                    ## dataframe of rows where t = current time step
+                    ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)].copy()
 
-        inequality_vector = linear_programming.create_inequality_vector( 
-                                                                         remaining_slots,
-                                                                         demands,
-                                                                         current_server_stock,
-                                                                         server_capacities
-                                                                        )
-        
-        objective_vector = linear_programming.create_objective_vector(  servers,
-                                                                        actives,
-                                                                        self.datacenters[datacenter].cost_of_energy
-                                                                    )
-        decision_variables = linear_programming.find_add_and_evict(inequality_matrix,inequality_vector, objective_vector,
-                                                                   self.datacenters[datacenter].getBounds(demands, servers,
-                                                                                                          actives))
-        assert len(decision_variables)== len(servers)+num_active
 
-        add = {}
-        remove = {}
+                    latency_demands = {}
 
-        for i in range(len(servers)):
-            remove[ servers[i].name ] = decision_variables[i]
+                    ## for all servers
+                    for server in self.server_types.keys():
+                        
+                        server_demand_df = ts_demand.loc[(ts_demand['server_generation']==server) ].copy()
+                        if server_demand_df.empty:
+                            latency_demands[server] = 0
+                        else:
+                            ## demand for the server generation at this latency 
+                            latency_demands[server] = server_demand_df.iloc[0][latency_sensitivity]
 
-        activeCount = 0
-        for i in range(len(actives)):
-            if actives[i]:
-                add[ servers[i].name] = decision_variables[len(servers)+activeCount]
-                activeCount += 1
+                    demands[latency_sensitivity] = latency_demands
 
-        return add, remove
+        return demands
+
+
+
+    def step(self):
+        self.timestep += 1
+
+      
+        self.checkConstraints()
+
+
+        ## PROCESS DEMAND FROM CSV
+        current_demand = self.processDemand()
+        demand_coeffs = self.get_all_demand_coefficients()
+
+        ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
+        for datacenter in self.datacenters.values():
+
+            weighted_demand = { server:
+                                         current_demand[datacenter.latency_sensitivity][server]
+                                         * 
+                                         demand_coeffs[datacenter.latency_sensitivity][datacenter.name]
+                                for server in self.server_types.keys()
+                            }
+            datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
+                                                        demands = weighted_demand
+                                                        )
+            
+
+
+        ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
+        for datacenter in self.datacenters.values():
+
+            for server, remove_amount in datacenter.removing_servers.items():
+                    
+                    self.sellServers(datacenter,server,math.ceil(remove_amount))
+
+            for server, add_amount in datacenter.adding_servers.items():
+                   
+                    self.buyServers(datacenter,server,int(add_amount))
+            
+
+
+
+
+
+
+    def solve(self):
+
+
+        for t in range(1, get_known('time_steps')+1):
+            self.step()
+
+
+        return self.solution
+
+
+
+
+   
+   
+   
+
+
+
     
-    
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -277,22 +359,3 @@ class DecisionMaker(object):
 
     
 
-    #  #get demand for each server and timestamp
-    # servers = get_known('server_generation') 
-    # for server in servers:
-    #     high_demand = []
-    #     medium_demand = []
-    #     low_demand = []
-    #     for ts in range(1, get_known('time_steps')+1):
-    #         server_df = actual_demand.loc[(actual_demand['time_step']==ts) 
-    #                                       & (actual_demand['server_generation']==server)].copy()
-            
-    #         #There is no demand of this particular server at the current timestamp
-    #         if server_df.empty:
-    #             high_demand.append(0)
-    #             medium_demand.append(0)
-    #             low_demand.append(0)
-    #         else:
-    #             high_demand.append(server_df.iloc[0]['high'])
-    #             medium_demand.append(server_df.iloc[0]['medium'])
-    #             low_demand.append(server_df.iloc[0]['low'])
