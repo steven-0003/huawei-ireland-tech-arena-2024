@@ -158,17 +158,19 @@ class DecisionMaker(object):
             energy_cost_sum += datacenter.cost_of_energy
             remaining_capacity_sum += datacenter.remainingCapacity()
         
-        return {d.name: self.calculateCoeff( d.cost_of_energy,
-                                        d.remainingCapacity(),
-                                        energy_cost_sum,
-                                        remaining_capacity_sum
-                                    )
+        return {d.name: self.calculateCoeff( 
+                                                d.cost_of_energy,
+                                                d.remainingCapacity(),
+                                                energy_cost_sum,
+                                                remaining_capacity_sum
+                                            )
                                         for d in datacenters
                                 }
         
 
     def calculateCoeff(self, energy_cost: int, remaining_capacity: int, energy_cost_sum: int, 
                        remaining_capacity_sum: int) -> float:
+        
         energy_frac = (energy_cost/energy_cost_sum)
         if energy_frac != 1:
             energy_frac = 1 - energy_frac
@@ -230,18 +232,41 @@ class DecisionMaker(object):
 
         return demands
 
+    ## returns a dictionary that maps latencys to datacenters to demand for each server
+    ## e.g. demand["high"]["DC3"]["CPU1"] = 99
+    ## equals the demand for high latency_sensitivity CP1 at DC1
+    def getWeightedDemand(self):
+
+        ## data center capacity score
+        ## we should score each data centre for a particular latency based on how much capacity it has remaining 
+        
+        ## based on the data center capcity score,
+        ## we should assign a certain fraction of the demand to it 
+        ## so if DC3 has a score of 30 and DC4 has a score of 10
+        ## DC3 should take 0.75 of the capacity of the demand 
+
+        ## we then rank the relevant datacenters by cost ascending, e.g. [DC4, DC3]    --   DC4.cost < DC3.cost
+        ## then assign DC4 the most expensive server until it has been assigned 0.25 of the capacity of the demand
+        ## carry on until all the demand for all servers has been assigned a datacenter 
+
+        ## Hopefully this would mean that datacenters with lower energy costs are given more expensive servers to run 
+
+
+        pass
 
 
     def step(self):
         self.timestep += 1
 
-      
+        
         self.checkConstraints()
 
 
         ## PROCESS DEMAND FROM CSV
         current_demand = self.processDemand()
         demand_coeffs = self.get_all_demand_coefficients()
+
+        
 
         ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
         for datacenter in self.datacenters.values():
@@ -268,6 +293,8 @@ class DecisionMaker(object):
             for server, add_amount in datacenter.adding_servers.items():
                    
                     self.buyServers(datacenter,server,int(add_amount))
+
+           
             
 
 
@@ -277,8 +304,8 @@ class DecisionMaker(object):
 
     def solve(self):
 
-
-        for t in range(1, get_known('time_steps')+1):
+        
+        for t in range(1, get_known('time_steps')+1-20):
             self.step()
 
 

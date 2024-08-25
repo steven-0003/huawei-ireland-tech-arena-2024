@@ -8,6 +8,10 @@ import numpy as np
 from helpers.server_type import Server
 
 
+demand_to_meet = 1.0 
+expected_lifetime = 1.0
+
+
 def find_add_and_evict( inequality_matrix, inequality_vector, objective , decision_var_bounds ):
 
     ## decision_var_bounds = range that the decision variables taken, is a tuple of (start_range, end_range)
@@ -99,7 +103,7 @@ def create_inequality_vector(remaining_slots: int, server_demands: List[int], se
 
     vector[0] = remaining_slots
 
-    demand_to_meet = 1.0
+    
 
     ## for each server add the demand that is yet to be met 
     for i in range(len(server_demands)):
@@ -114,9 +118,6 @@ def create_inequality_vector(remaining_slots: int, server_demands: List[int], se
 def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_cost: float , latency_sensitivity:str ):
 
     assert len(servers)==len(actives) , "Length of selling prices is not equal to the length of the energy consumptions"
-
-    ## the fraction of a lifetime we expect a server to last, parameter we need to set 
-    expected_lifetime = 0.7
 
 
     ## calculate profit for each server
