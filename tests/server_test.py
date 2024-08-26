@@ -16,8 +16,8 @@ class serversTest(unittest.TestCase):
     def test_canNotBeDeployed(self):
         self.assertFalse(self.server.canBeDeployed(61))
 
-    def test_setSellingPrice(self):
-        self.server.setSellingPrice(100)
-        self.assertEqual(self.server.selling_price, 100)
+    def test_setSellingPrices(self):
+        self.server.setSellingPrices(100)
+        self.assertEqual(self.server.selling_prices, 100)
 
     
