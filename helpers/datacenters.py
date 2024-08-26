@@ -1,6 +1,7 @@
-from typing import List
+from typing import List, Self
 from helpers.server_type import Server
 import linear_programming
+import math
 
 
  
@@ -54,6 +55,20 @@ class Datacenter(object):
 
         return id
     
+    def move_server(self, seller: Self, server_type: str) -> str:
+        assert(len(seller.inventory[server_type]) > 0)
+
+        server = seller.inventory[server_type].pop()
+        seller.inventory_level -= self.server_types[server_type].slots_size
+        seller.removing_servers[server_type] -= 1
+
+        self.inventory[server_type].append(server)
+        self.inventory[server_type].sort(key=lambda x: x[0])
+        self.inventory_level += self.server_types[server_type].slots_size
+        self.adding_servers[server_type] -= 1
+
+        return server[1]
+
   
     
     def check_lifetime(self, cur_timestep: int) -> None:
@@ -98,9 +113,8 @@ class Datacenter(object):
     ## demands = a dictionary of server types to demand 
     def find_add_remove_for_all_servers(self, timestep , demands):
         
-        for server in self.server_types: 
-            self.adding_servers, self.removing_servers = self.getAddRemove(demands, timestep)
-
+        self.adding_servers, self.removing_servers = self.getAddRemove(demands, timestep)
+            
 
 
 
@@ -154,17 +168,22 @@ class Datacenter(object):
         remove = {}
 
         for i in range(len(servers)):
-            remove[ servers[i].name ] = decision_variables[i]
+            remove[ servers[i].name ] = math.ceil(decision_variables[i])
 
         activeCount = 0
         for i in range(len(actives)):
             if actives[i]:
-                add[ servers[i].name] = decision_variables[len(servers)+activeCount]
+                add[ servers[i].name] = math.floor(decision_variables[len(servers)+activeCount])
                 activeCount += 1
 
         return add, remove
 
-
+    def getProfitability(self) -> float:
+        if self.latency_sensitivity == 'low':
+            return 1 * self.cost_of_energy
+        if self.latency_sensitivity == 'medium':
+            return 2 * self.cost_of_energy
+        return 3 * self.cost_of_energy
             
 
         

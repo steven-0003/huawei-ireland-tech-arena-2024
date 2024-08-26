@@ -120,6 +120,23 @@ class DecisionMaker(object):
             server_id = datacenter.sell_server(server_type)
             self.addToSolution(self.timestep, datacenter.name, server_type, server_id, "dismiss")
 
+    def moveServers(self) -> None:
+        sorted_datacenters = sorted(self.datacenters.values(), key= lambda x: x.getProfitability(), reverse=True)
+        for buyer in sorted_datacenters:
+            for server in [add for add in buyer.adding_servers.keys() 
+                           if buyer.adding_servers[add] > 0]:
+                for _ in range(buyer.adding_servers[server]):
+                    valid_dcs = [dc for dc in sorted_datacenters if buyer!=dc 
+                                and dc.removing_servers[server] > 0]
+                    
+                    if len(valid_dcs) == 0:
+                        break
+
+                    seller = max(valid_dcs, key=lambda x: x.inventory[server][-1][0])
+                    server_id = buyer.move_server(seller, server)
+                    self.addToSolution(self.timestep, buyer.name, server, server_id, "move")
+    
+    
     def checkConstraints(self) -> None:
 
         ## check whether a datacenter contains servers that exceed their lifetime 
@@ -280,19 +297,18 @@ class DecisionMaker(object):
             datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
                                                         demands = weighted_demand
                                                         )
-            
-
+        #self.moveServers()
 
         ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
         for datacenter in self.datacenters.values():
 
             for server, remove_amount in datacenter.removing_servers.items():
                     
-                    self.sellServers(datacenter,server,math.ceil(remove_amount))
+                    self.sellServers(datacenter,server,remove_amount)
 
             for server, add_amount in datacenter.adding_servers.items():
                    
-                    self.buyServers(datacenter,server,int(add_amount))
+                    self.buyServers(datacenter,server,add_amount)
 
            
             
