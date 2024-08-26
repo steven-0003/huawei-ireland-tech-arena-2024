@@ -297,7 +297,7 @@ class DecisionMaker(object):
             datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
                                                         demands = weighted_demand
                                                         )
-        #self.moveServers()
+        self.moveServers()
 
         ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
         for datacenter in self.datacenters.values():

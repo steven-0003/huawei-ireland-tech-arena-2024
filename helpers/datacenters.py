@@ -73,19 +73,11 @@ class Datacenter(object):
     
     def check_lifetime(self, cur_timestep: int) -> None:
         for server_type in self.inventory.keys():
+            queue = self.inventory[server_type]
 
-            for i in range( len(self.inventory[server_type]) ):
-
-                ## get timestep at which last item in inventory for this server was dedployed
-                deployed_timestep = self.inventory[server_type][i][0]
-                
-                ## if server has exceeded its lifetime remove it 
-                if cur_timestep - deployed_timestep > self.server_types[server_type].life_expectancy:
-                    self.inventory[server_type].pop(i)
-                    self.inventory_level -= self.server_types[server_type].slots_size
-                else:
-
-                    break
+            while(len(queue) != 0 and cur_timestep - queue[0][0] >= self.server_types[server_type].life_expectancy):
+                self.inventory[server_type].pop(0)
+                self.inventory_level -= self.server_types[server_type].slots_size
 
     def remainingCapacity(self) -> int:
         return self.slots_capacity - self.inventory_level

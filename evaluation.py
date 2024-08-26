@@ -469,11 +469,16 @@ def evaluation_function(solution,
     # SET RANDOM SEED
     np.random.seed(seed)
     # EVALUATE SOLUTION
-    return get_evaluation(solution, 
+    try:
+        return get_evaluation(solution, 
                               demand,
                               datacenters,
                               servers,
                               selling_prices,
                               time_steps=time_steps, 
                               verbose=verbose)
+    # CATCH EXCEPTIONS
+    except Exception as e:
+        logger.error(e)
+        return None
 
