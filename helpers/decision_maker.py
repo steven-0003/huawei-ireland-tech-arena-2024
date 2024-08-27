@@ -27,6 +27,7 @@ class DecisionMaker(object):
 
         self.id = 0
         self.timestep = 0
+        self.canBuy = True
         self.solution = []
 
     def generateUniqueId(self) -> str:
@@ -163,7 +164,7 @@ class DecisionMaker(object):
     
 
     def getLatencyDataCenters(self, latency_sensitivity: str) -> dict[str,Datacenter]:
-        return {d: self.datacenters[d] for d in self.datacenters 
+        return {d: self.datacenters[d] for d in self.datacenters.keys() 
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
     
     
@@ -191,9 +192,7 @@ class DecisionMaker(object):
         energy_frac = (energy_cost/energy_cost_sum)
         if energy_frac != 1:
             energy_frac = 1 - energy_frac
-        if remaining_capacity_sum == 0:
-            return energy_frac
-        return 1/2 * (energy_frac + (remaining_capacity/remaining_capacity_sum))
+        return energy_frac
     
     """ 
         returns ALL  of the demand coeffecients as a nested dictionary 
@@ -204,7 +203,7 @@ class DecisionMaker(object):
         e.g. coefficients["low"]["DC1"] will return the coefficient for D   
         TODO: it may be worth testing that for coefficients[latency_sensitivity] all the coefficients add up to 1
     """
-    def get_all_demand_coefficients(self):
+    def get_all_demand_coefficients(self) -> dict[str, dict[str, float]]:
 
         demand_coefficients = {}
         for latency_sensitivity in get_known('latency_sensitivity'):
@@ -220,7 +219,7 @@ class DecisionMaker(object):
     """
      Processes the demand from the csv
     """
-    def processDemand(self):
+    def processDemand(self) -> dict[str, dict[str, int]]:
 
         demands = {}
 
@@ -243,7 +242,7 @@ class DecisionMaker(object):
                             latency_demands[server] = 0
                         else:
                             ## demand for the server generation at this latency 
-                            latency_demands[server] = server_demand_df.iloc[0][latency_sensitivity]
+                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (20/19))
 
                     demands[latency_sensitivity] = latency_demands
 
@@ -252,7 +251,7 @@ class DecisionMaker(object):
     ## returns a dictionary that maps latencys to datacenters to demand for each server
     ## e.g. demand["high"]["DC3"]["CPU1"] = 99
     ## equals the demand for high latency_sensitivity CP1 at DC1
-    def getWeightedDemand(self):
+    def getWeightedDemand(self, cur_demand: dict[str, dict[str, int]]) -> dict[str, dict[str, float]]:
 
         ## data center capacity score
         ## we should score each data centre for a particular latency based on how much capacity it has remaining 
@@ -268,13 +267,58 @@ class DecisionMaker(object):
 
         ## Hopefully this would mean that datacenters with lower energy costs are given more expensive servers to run 
 
+        weighted_demand = dict()
+        for latency_sensitivity in get_known('latency_sensitivity'):
 
-        pass
+            # Get all datacenters from a latency sensitivity
+            dcs = list(self.getLatencyDataCenters(latency_sensitivity).values())
 
+            # There is only 1 datacenter in a latency sensitivity so there is no need
+            # apply weights
+            if len(dcs) == 1:
+                weighted_demand[dcs[0].name] = cur_demand[latency_sensitivity]
+                continue
+            remaining_capacity_sum = sum([dc.remainingCapacity() for dc in dcs])
+
+            # Calculate the fraction of demand each datacenter should have based on the
+            # remaining capacity
+            dc_coeffs = {dc.name: (dc.remainingCapacity()/remaining_capacity_sum if 
+                                  remaining_capacity_sum > 0 else 0) for dc in dcs}
+
+            # Rank datacenters based on cost of energy in ascending order
+            dc_rank = sorted(dcs, key=lambda x: x.cost_of_energy)
+            latency_demand = cur_demand[latency_sensitivity]
+
+            
+            for dc in dc_rank:
+
+                met_demand = 0
+                demand_coeff = dc_coeffs[dc.name]
+                total_latency_demand = sum(latency_demand.values())
+                demand_to_meet = total_latency_demand * demand_coeff
+                server_rank_by_cost = sorted(self.server_types.values(), key=lambda x: x.energy_consumption, reverse=True)
+                dc_demand = dict()
+                
+                # Assign the highest cost servers to the lowest cost datacenter
+                for server in server_rank_by_cost:
+                    server_demand = latency_demand[server.name]
+                    dc_demand[server.name] = 0
+                    if latency_demand[server.name] == 0:
+                        continue
+
+                    for _ in range(server_demand):
+                        if met_demand + self.server_types[server.name].capacity > demand_to_meet:
+                            break
+                        dc_demand[server.name] += 1
+                        latency_demand[server.name] -= 1
+                weighted_demand[dc.name] = dc_demand
+        return weighted_demand
 
     def step(self):
         self.timestep += 1
 
+        if self.timestep >= get_known('time_steps')-35:
+            self.canBuy = False
         
         self.checkConstraints()
 
@@ -282,8 +326,7 @@ class DecisionMaker(object):
         ## PROCESS DEMAND FROM CSV
         current_demand = self.processDemand()
         demand_coeffs = self.get_all_demand_coefficients()
-
-        
+        #weighted_demand = self.getWeightedDemand(current_demand)
 
         ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
         for datacenter in self.datacenters.values():
@@ -297,18 +340,20 @@ class DecisionMaker(object):
             datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
                                                         demands = weighted_demand
                                                         )
+        
         self.moveServers()
-
+            
         ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
         for datacenter in self.datacenters.values():
 
             for server, remove_amount in datacenter.removing_servers.items():
-                    
+                        
                     self.sellServers(datacenter,server,remove_amount)
 
-            for server, add_amount in datacenter.adding_servers.items():
-                   
-                    self.buyServers(datacenter,server,add_amount)
+            if self.canBuy:
+                for server, add_amount in datacenter.adding_servers.items():
+                            
+                        self.buyServers(datacenter,server,add_amount)
 
            
             
@@ -321,7 +366,7 @@ class DecisionMaker(object):
     def solve(self):
 
         
-        for t in range(1, get_known('time_steps')+1-20):
+        for t in range(1, get_known('time_steps')+1):
             self.step()
 
 
