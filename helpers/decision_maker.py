@@ -1,12 +1,18 @@
 import math
 from typing import List
 import pandas as pd
+import numpy as np
 from evaluation import get_known
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
 import ast
 import linear_programming
+
+from statsmodels.tsa.api import Holt
+import warnings
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+warnings.simplefilter('ignore', ConvergenceWarning)
 
 
 class DecisionMaker(object):
@@ -241,8 +247,29 @@ class DecisionMaker(object):
                         if server_demand_df.empty:
                             latency_demands[server] = 0
                         else:
-                            ## demand for the server generation at this latency 
-                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (20/19))
+                            ## demand for the server generation at this latency for all timesteps <= current timestep
+                            server_demand =  self.demand.loc[(self.demand['server_generation'] == server)
+                                                             & (self.demand['time_step'] <= self.timestep)].copy()
+                            ls_demand = server_demand[['time_step', latency_sensitivity]].copy()
+                            endog = ls_demand[latency_sensitivity].to_numpy()
+                            
+                            ## If we have demand for only one timestep, use the actual demand
+                            if len(endog)==1:
+                                latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (20/19))
+                                continue
+                            
+                            ## Apply holt's damped smoothing to the demand
+                            np.seterr(divide='ignore')
+                            fit = Holt(endog, damped_trend=True, initialization_method="legacy-heuristic").fit(
+                                    smoothing_level=0.15, smoothing_trend=0.1, 
+                                )
+                            d = fit.fittedvalues
+
+                            ## In some cases such as holt's, it will produce negative values, so just set it to 0
+                            ## TODO: Deal with this in a better way. boxcox parameter in Holt can potentially be used
+                            d[d<0] = 0
+                            latency_demands[server] = int(d[-1] * (20/19))
+                            np.seterr(divide='warn')
 
                     demands[latency_sensitivity] = latency_demands
 
