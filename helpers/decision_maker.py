@@ -398,13 +398,12 @@ class DecisionMaker(object):
 
 
     
-    def calculate_normalized_lifespan(datacenter):
+    #calculate L, the normalized lifespan
+    def calculate_lifespan(datacenter):
         total_servers = 0
         lifespan_sum = 0
 
         for server_type, server in datacenter.server_types.items():
-
-            #retrieve the list of operating times for all servers of this type in the datacenter
             servers = datacenter.inventory[server_type]
 
             for deployed_time in servers:
@@ -417,6 +416,7 @@ class DecisionMaker(object):
         return lifespan_sum / total_servers if total_servers > 0 else 0 # If there are no servers, return 0 to avoid division by zero
     
 
+    #calculate U
     def calculate_utilization(datacenter, demand, failure_rate):
         total_pairs = 0
         utilization_sum = 0
@@ -431,19 +431,102 @@ class DecisionMaker(object):
 
             #calculate utilization for each time step in the demand values
             for demand_value in demand_values:
-                #calculate met demand as the minimum of adjusted capacity and demand value
                 met_demand = min(adjusted_capacity, demand_value)
 
-                #calculate utilization ratio for this time step
                 utilization_ratio = met_demand / adjusted_capacity
-
-                #add utilization ratio to the total sum
                 utilization_sum += utilization_ratio
-
                 total_pairs += 1
 
         # calculate average utilization U
         return utilization_sum / total_pairs if total_pairs > 0 else 0 # If there are no pairs, return 0 to avoid division by zero.
 
+
+    #calculate U at timestep
+    def calculateUtilizationAtTimestep(self, timestep: int) -> float:
+        utilization_sum = 0
+        total_pairs = 0
+
+        #get the current demand
+        current_demand = self.processDemand()
+
+        for datacenter in self.datacenters.values():
+            #get demand coefficients
+            demand_coeffs = self.getDemandCoeffs([datacenter])
+            #get weighted demand for the datacenter
+            weighted_demand = {
+                server: current_demand[datacenter.latency_sensitivity][server] * demand_coeffs[datacenter.name]
+                for server in self.server_types.keys()
+            }
+
+            for server, demand_value in weighted_demand.items():
+                #get server capacity
+                capacity = datacenter.getServerCapacity(server)
+                adjusted_capacity = capacity * (1 - get_known.adjust_capacity_by_failure_rate())
+                met_demand = min(adjusted_capacity, demand_value)
+
+                utilization_sum += met_demand / adjusted_capacity
+                total_pairs += 1
+
+        return utilization_sum / total_pairs if total_pairs > 0 else 0  # If there are no pairs, return 0 to avoid division by zero.
+
+
+    #calculate the lifespan at a given timestep
+    def calculateLifespanAtTimestep(self, timestep: int) -> float:
+        lifespan_sum = 0
+        total_servers = 0
+
+        for datacenter in self.datacenters.values():
+            for server_type, server_list in datacenter.inventory.items():
+                for deployed_time in server_list:
+                    server = self.server_types[server_type]
+                    lifespan_sum += deployed_time / server.life_expectancy
+                    total_servers += 1
+
+        return lifespan_sum / total_servers if total_servers > 0 else 0 # If there are no pairs, return 0 to avoid division by zero.
     
+
+    #calculate the profit at a given timestep
+    def calculateProfitAtTimestep(self, servers: List[Server], timestep: int) -> float:
+        profit = 0
+
+        for datacenter in self.datacenters.values():
+            revenue = 0
+            costs = 0
+
+            for server_type, server_list in datacenter.inventory.items():
+                server = self.server_types[server_type]
+                for server_id, deployed_time in server_list:
+                    #revenue =  selling price * capacity * latency sensitivity
+                    revenue += server.selling_prices[datacenter.latency_sensitivity] * server.capacity
+
+                    #costs = purchase price, maintenance fee, and energy cost
+                    costs += server.purchase_price
+                    #FIXME: cost of maintenance is ignored for now
+                    # costs += server.average_maintenance_fee
+                    costs += datacenter.cost_of_energy * server.energy_consumption
+
+                    # linear_programming.purchase_price(datacenter.latency_sensitivity)
+
+            profit += (revenue - costs)
+
+        return profit
+
+    # Calculate the objective value.
+    def calculateObjectiveAtTimestep(self, timestep: int) -> float:
+        U = self.calculateUtilizationAtTimestep(timestep)
+        L = self.calculateLifespanAtTimestep(timestep)
+        P = self.calculateProfitAtTimestep(timestep)
+
+        #FIXME: is there a weight for each of these?
+        # utilizationWeight = 1.0
+        # lifespanWeight = 1.0
+        # profitWeight = 1.0
+
+        if U <= 0 or L <= 0 or P <= 0:
+            return 0
+
+        objective_value = U*L*P
+        # objective_value = utilizationWeight * U + lifespanWeight * L + profitWeight * P
+        return objective_value
+
 
