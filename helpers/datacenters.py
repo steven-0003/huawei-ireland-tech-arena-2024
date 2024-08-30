@@ -1,4 +1,5 @@
-from typing import List, Self
+from typing import List
+from typing_extensions import Self
 from helpers.server_type import Server
 import linear_programming
 import math
@@ -107,6 +108,18 @@ class Datacenter(object):
         
         self.adding_servers, self.removing_servers = self.getAddRemove(demands, timestep)
             
+
+    def getServerStock(self, server_name):
+        return len(self.inventory.get(server_name, []))
+    
+    def getStockLevel(self):
+
+        sum = 0 
+
+        for i in self.server_types:
+            sum += self.getServerStock(i)
+
+        return sum
 
 
 

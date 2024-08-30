@@ -26,3 +26,8 @@ class Server(object):
         return(cur_timestep >= self.release_time[0] and cur_timestep <= self.release_time[1])
 
 
+    def getTimeTillProfitable(self, latency_sensitivity):
+
+        k = 8
+
+        return  self.purchase_price /  (self.selling_prices[latency_sensitivity] * self.life_expectancy) + k
