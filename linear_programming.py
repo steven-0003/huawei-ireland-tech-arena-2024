@@ -147,7 +147,7 @@ def create_objective_vector(servers: List[Server], actives : List[bool] ,energy_
         ## if server is active add expected profit of adding it 
         if actives[s]:
 
-            objective_vector[len(servers)+active_count] = profits[s] * 0.2
+            objective_vector[len(servers)+active_count] = profits[s] * 0.5
             active_count+=1
 
     assert active_num == active_count
