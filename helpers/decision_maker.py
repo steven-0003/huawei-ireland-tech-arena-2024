@@ -8,6 +8,8 @@ from helpers.server_type import Server
 import ast
 import linear_programming
 
+from waqee import moveLP
+
 
 class DecisionMaker(object):
 
@@ -87,7 +89,7 @@ class DecisionMaker(object):
 
     
 
-    def buyServers(self, datacenter: str, server_type: str, quantity: int) -> None:
+    def buyServers(self, datacenter: Datacenter, server_type: str, quantity: int) -> None:
         # check if server type exists
         if server_type not in self.server_types:
             raise ValueError(f"Server type '{server_type}' does not exist.")
@@ -106,7 +108,7 @@ class DecisionMaker(object):
             
             self.addToSolution(self.timestep, datacenter.name, server_type, server_id, "buy")
 
-    def sellServers(self, datacenter: str, server_type: str, quantity: int) -> None:
+    def sellServers(self, datacenter: Datacenter, server_type: str, quantity: int) -> None:
         # check if server type exists
         if server_type not in self.server_types:
             raise ValueError(f"Server type '{server_type}' does not exist.")
@@ -316,6 +318,7 @@ class DecisionMaker(object):
 
     def step(self):
         self.timestep += 1
+        print(self.timestep)
 
         if self.timestep >= get_known('time_steps')-35:
             self.canBuy = False
@@ -328,32 +331,56 @@ class DecisionMaker(object):
         demand_coeffs = self.get_all_demand_coefficients()
         #weighted_demand = self.getWeightedDemand(current_demand)
 
-        ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
-        for datacenter in self.datacenters.values():
-
-            weighted_demand = { server:
-                                         current_demand[datacenter.latency_sensitivity][server]
-                                         * 
-                                         demand_coeffs[datacenter.latency_sensitivity][datacenter.name]
-                                for server in self.server_types.keys()
-                            }
-            datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
-                                                        demands = weighted_demand
-                                                        )
+        m = moveLP(self.datacenters,self.server_types,self.demand,self.timestep)
+        m.solve()
         
-        self.moveServers()
-            
-        ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
-        for datacenter in self.datacenters.values():
+        # ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
+        # for datacenter in self.datacenters.values():
 
-            for server, remove_amount in datacenter.removing_servers.items():
+        #     weighted_demand = { server:
+        #                                  current_demand[datacenter.latency_sensitivity][server]
+        #                                  * 
+        #                                  demand_coeffs[datacenter.latency_sensitivity][datacenter.name]
+        #                         for server in self.server_types.keys()
+        #                     }
+        #     datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
+        #                                                 demands = weighted_demand
+        #                                                 )
+        
+        # self.moveServers()
+
+        for moveVar in m.variables:
+            details = moveVar.split("_")
+            from_dc = details[0]
+            to_dc = details[1]
+            s = details[2]
+            for _ in range(int(m.variables[moveVar].varValue)): 
+                self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
+
+        for removeVar in m.removeVariables:
+            details = removeVar.split("_")
+            dc = details[0]
+            s = details[1]
+            self.sellServers(self.datacenters[dc], s, int(m.removeVariables[removeVar].varValue))
+
+        for addVar in m.addVariables:
+            details = addVar.split("_")
+            dc = details[0]
+            s = details[1]
+            self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
+
+        
+        # ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
+        # for datacenter in self.datacenters.values():
+
+        #     for server, remove_amount in datacenter.removing_servers.items():
                         
-                    self.sellServers(datacenter,server,remove_amount)
+        #             self.sellServers(datacenter,server,remove_amount)
 
-            if self.canBuy:
-                for server, add_amount in datacenter.adding_servers.items():
+        #     if self.canBuy:
+        #         for server, add_amount in datacenter.adding_servers.items():
                             
-                        self.buyServers(datacenter,server,add_amount)
+        #                 self.buyServers(datacenter,server,add_amount)
 
            
             
