@@ -127,7 +127,11 @@ class moveLP:
                                             + [self.addVariables[var] * self.server_types[var.split("_")[1]].capacity for var in self.addVariables  if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
                                               + [-self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity for var in self.removeVariables  if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   ) 
                                     <=
-                                    self.demand[latency][s]
+                                    self.demand[latency][s] - sum( [ 
+                                                                    dc.getServerStock(s)*self.server_types[s].capacity
+                                                                    for dc in self.datacenters.values()
+                                                                    if dc.latency_sensitivity==latency 
+                                                                ])
                                 , s+latency+ " Adds - Removes + Moves to datacenters of this latency shouldnt exceed the demand Constraint"
                                 )
                 
