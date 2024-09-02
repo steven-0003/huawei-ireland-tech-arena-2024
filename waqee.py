@@ -210,8 +210,8 @@ class moveLP:
         latency = datacenter.latency_sensitivity
         server = self.server_types[var_details[2]]
         profit = server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy)
-                                                                     + (server.cost_of_moving / server.life_expectancy)
-                                                                     + (server.avg_maintenance_fee / server.life_expectancy))
+                                                                     + (server.cost_of_moving )
+                                                                     + (server.avg_maintenance_fee ))
         return profit
 
     def getRemoveObjectiveCoeff(self, var):

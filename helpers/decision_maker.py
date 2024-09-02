@@ -1,4 +1,5 @@
 import math
+import time
 from typing import List
 import pandas as pd
 from evaluation import get_known
@@ -354,8 +355,9 @@ class DecisionMaker(object):
             from_dc = details[0]
             to_dc = details[1]
             s = details[2]
-            for _ in range(int(m.variables[moveVar].varValue)): 
-                self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
+            for _ in range(int(m.variables[moveVar].varValue)):
+                server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
+                self.addToSolution(self.timestep, to_dc, s, server_id, "move")
 
         for removeVar in m.removeVariables:
             details = removeVar.split("_")
