@@ -14,7 +14,7 @@ class moveLP:
     def __init__(self, datacenters: dict[str, Datacenter], server_types: dict[str, Server], demand, timestep: int):
         self.datacenters = datacenters
         self.server_types = server_types
-        self.demand  = get_demand(demand, timestep)
+        self.demand  = demand
         self.timestep = timestep
 
         ## create model 
