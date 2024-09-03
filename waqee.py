@@ -91,7 +91,8 @@ class moveLP:
                 (dc.name+"_"+server.name) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-            ]
+            ],
+            cat="Integer"
         )
 
         ## variables to indicate whether we are increasing the number of servers of a particular type at a datacenter
@@ -209,28 +210,48 @@ class moveLP:
         for s in self.server_types:
             for f,dc in self.datacenters.items():
 
-                self.model += (pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] 
-                                          + [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s]  ) <= dc.getServerStock(s),
-                                f+s+" Move + Add Less Than Current Stock Constraint")
+                self.model += (
+                                    pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] 
+                                            +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s]
+                                        )
+                            
+                                            <= dc.getServerStock(s),
+                                        
+                                        f+s+" Move + Add Less Than Current Stock Constraint"
+                            )
                 
 
         ## the sum of all the servers moving from f, the servers being removed from f and the servers being held at f
-        ## should be less than the current stock of that server
+        ## should be equal to the current stock of that server
         for s in self.server_types:
             for f,dc in self.datacenters.items():
-
+                
                 self.model += (pulp.lpSum(  [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] 
                                           + [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s] 
                                           + [self.holdVariables[var] for var in self.holdVariables if var.split("_")[0]==f and var.split("_")[1] == s]
-                                          ) <= dc.getServerStock(s),
-                                f+s+" -Move - Remove + Hold Less Than Current Stock Constraint")
+                                          ) == dc.getServerStock(s),
+                                f+s+" -Move - Remove + Hold Equal To Current Stock Constraint")
+                
+        for f, dc in self.datacenters.items():
+
+            self.model += (
+                            pulp.lpSum(
+                                    [self.variables[var] for var in self.variables if var.split("_")[0]==f]
+                                +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f]
+                                +   [self.holdVariables[var] for var in self.holdVariables if var.split("_")[0]==f]
+                            )
+                            == dc.getStockLevel(),
+                            f+"Number of servers being moved from, removed from and held at this datacenter should be less than total number of servers at this datacenter Constraint"
+            )
             
         ## the amount of servers of type s being moved from a datacentre, should be less than the current stock of s in the datacenter 
         for s in self.server_types:
             for f,dc in self.datacenters.items():
 
-                self.model += (pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] ) <= dc.getServerStock(s),
-                               f+s+" Move Less Than Current Stock Constraint")
+                self.model += (
+                                    pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] )
+                                    <= dc.getServerStock(s),
+                                    f+s+" Move Less Than Current Stock Constraint")
         
 
         
@@ -246,17 +267,17 @@ class moveLP:
                                                     for var in self.variables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
 
-                                            +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
-                                                    for var in self.variables
-                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[2]==s ] 
+                                            # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
+                                            #         for var in self.variables
+                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[2]==s ] 
 
                                             +   [   self.addVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.addVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
 
-                                            +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
-                                                    for var in self.removeVariables  
-                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                            #         for var in self.removeVariables  
+                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
                                             +
                                                 [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.holdVariables
@@ -284,26 +305,26 @@ class moveLP:
                                                 for var in self.variables
                                                 if var.split("_")[1]==t
                                         ]
-                                        +
-                                        [
-                                             (-self.variables[var] * self.server_types[ var.split("_")[2]].slots_size )
-                                                for var in self.variables
-                                                if var.split("_")[0]==t
-                                        ]
+                                        # +
+                                        # [
+                                        #      (-self.variables[var] * self.server_types[ var.split("_")[2]].slots_size )
+                                        #         for var in self.variables
+                                        #         if var.split("_")[0]==t
+                                        # ]
                                         +
                                         [
                                             (self.addVariables[var] * self.server_types[var.split("_")[1]].slots_size)
                                                 for var in self.addVariables
                                                 if var.split("_")[0]==t
                                         ]
-                                        +
-                                        [
-                                            (-self.removeVariables[var] * self.server_types[var.split("_")[1]].slots_size)
-                                                for var in self.removeVariables
-                                                if var.split("_")[0]==t
-                                        ]
+                                        # +
+                                        # [
+                                        #     (-self.removeVariables[var] * self.server_types[var.split("_")[1]].slots_size)
+                                        #         for var in self.removeVariables
+                                        #         if var.split("_")[0]==t
+                                        # ]
                                         
-                                        ## account for hold variables
+                                        
                                         +
                                         [
                                            (self.holdVariables[var] * self.server_types[var.split("_")[1]].slots_size )
@@ -317,7 +338,7 @@ class moveLP:
                                     ## THIS CONSTRAINT IS PROBLEMATIC
                                     ## SHOULD BE  <= dc.slots_capacity
                                     ## BUT THAT GIVES AN ERROR FOR SOME REASON??
-                                    dc.slots_capacity - dc.inventory_level
+                                    dc.slots_capacity ##- dc.inventory_level
 
                                     , t + " Slots Taken Do Not Exceed Capacity Constraint"
 
@@ -361,7 +382,7 @@ class moveLP:
         server = self.server_types[var_details[1]]
        
         profit = server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy))
-        profit = profit / server.life_expectancy
+        profit = int(profit / server.life_expectancy)+1
                                                                     
                   
 
@@ -394,7 +415,7 @@ class moveLP:
                                 
                             )
                             - 
-                            (server.cost_of_moving / (server.life_expectancy*0.5))
+                            int((server.cost_of_moving / (server.life_expectancy*0.5))+1)
                     ) 
                     
         return profit 
