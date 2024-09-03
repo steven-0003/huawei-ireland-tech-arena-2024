@@ -23,10 +23,13 @@ def get_my_solution(d):
 
 
 
-seeds = known_seeds('training')
+seeds = known_seeds('test')
+
+
 
 demand = pd.read_csv('./data/demand.csv')
 for seed in seeds:
+    print(f"SEED: #{seed}")
     # SET THE RANDOM SEED
     np.random.seed(seed)
 
