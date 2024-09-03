@@ -363,6 +363,8 @@ class DecisionMaker(object):
 
         m = moveLP(self.datacenters,self.server_types,current_demand,self.timestep)
         m.solve()
+
+        assert m.model.status == 1, "LINNEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION"
         
         # ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
         # for datacenter in self.datacenters.values():
