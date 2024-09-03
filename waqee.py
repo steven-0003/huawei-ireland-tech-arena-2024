@@ -21,11 +21,15 @@ class moveLP:
         self.model = pulp.LpProblem("moves", pulp.LpMaximize)
         self.solver = pulp.PULP_CBC_CMD(msg=0)
 
+   
 
         self.createVariables()
         self.setBounds()
         self.createConstraints()
         self.createObjective()
+        self.createElasticDemandConstraints()
+        
+        
 
 
 
@@ -103,6 +107,8 @@ class moveLP:
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
             ],
+            lowBound=0,
+            upBound=1,
             cat = "Binary"
         )
 
@@ -114,6 +120,8 @@ class moveLP:
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
             ],
+            lowBound=0,
+            upBound=1,
             cat = "Binary"
         )
         
@@ -141,7 +149,7 @@ class moveLP:
             self.addVariables[var].lowBound=0
             var_details = var.split("_")
             latency = self.datacenters[var_details[0]].latency_sensitivity
-            self.addVariables[var].upBound= self.demand[latency][var_details[1]]
+            self.addVariables[var].upBound= self.demand[latency][var_details[1]] 
 
 
         for var in self.removeVariables:
@@ -257,12 +265,14 @@ class moveLP:
         
 
 
+        
+        
         ## the number of servers of a particular type moving to a datacentre, shouldnt exceed the demand for that server at that datacenter
         for s in self.server_types:            
             for latency in get_known('latency_sensitivity'):
 
-                self.model += (
-                                pulp.lpSum(  
+                self.model +=         (         
+                                            pulp.lpSum(  
                                                 [   self.variables[var] * self.server_types[var.split("_")[2]].capacity 
                                                     for var in self.variables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
@@ -284,7 +294,7 @@ class moveLP:
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
                                     <=
-                                    self.demand[latency][s] 
+                                    self.demand[latency][s] * 1.05
                                     # -
                                     # sum( [ 
                                     #                                 dc.getServerStock(s)*self.server_types[s].capacity
@@ -294,6 +304,15 @@ class moveLP:
                                 , s+latency+ " Adds - Removes + Moves to datacenters of this latency shouldnt exceed the demand Constraint"
                                 )
                 
+                
+
+
+
+
+
+
+
+
 
         ## the total slot size of the servers going in and out of a datacenter should not exceed the slot capacity 
         for t, dc in self.datacenters.items():
@@ -349,6 +368,54 @@ class moveLP:
 
 
 
+    def createElasticDemandConstraints(self):
+        
+        ## the number of servers of a particular type moving to a datacentre, shouldnt exceed the demand for that server at that datacenter
+        for s in self.server_types:            
+            for latency in get_known('latency_sensitivity'):
+
+                # self.model += 
+                constraint= pulp.LpConstraint           (
+                                e=pulp.lpSum(  
+                                                [   self.variables[var] * self.server_types[var.split("_")[2]].capacity 
+                                                    for var in self.variables
+                                                    if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
+
+                                            # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
+                                            #         for var in self.variables
+                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[2]==s ] 
+
+                                            +   [   self.addVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                                    for var in self.addVariables
+                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
+
+                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                            #         for var in self.removeVariables  
+                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                            +
+                                                [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                                    for var in self.holdVariables
+                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
+                                            ) 
+                                    # <=
+                                    , sense=pulp.LpConstraintEQ
+                                    # ,self.demand[latency][s] 
+                                    # -
+                                    # sum( [ 
+                                    #                                 dc.getServerStock(s)*self.server_types[s].capacity
+                                    #                                 for dc in self.datacenters.values()
+                                    #                                 if dc.latency_sensitivity==latency 
+                                    #                             ])
+                                , name=s+latency+ " Adds - Removes + Moves to datacenters of this latency shouldnt exceed the demand Constraint"
+                                ,rhs=self.demand[latency][s]
+                                )
+                
+                econstraint = constraint.makeElasticSubProblem(-100,proportionFreeBound = 0)
+                self.model.extend(econstraint)
+                
+
+        
+
 
 
     def createObjective(self):
@@ -402,9 +469,19 @@ class moveLP:
         from_datacenter = self.datacenters[var_details[0]]
         from_latency=  from_datacenter.latency_sensitivity
 
-        
+        avg =             (  ((   
+                                server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
+                                
+                            )
+                            -
+                            (   
+                                server.selling_prices[from_latency] * server.capacity -  (server.energy_consumption * from_datacenter.cost_of_energy)  
+                                
+                            ))
+                            /2)
 
-        profit =    (   
+        profit =    (       
+                            avg+
                             (   
                                 server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
                                 
@@ -428,7 +505,7 @@ class moveLP:
         server = self.server_types[var_details[1]]
     
         profit = -server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy) )
-        profit *= (server.life_expectancy*0.5)
+        profit *= (server.life_expectancy*0.75)
                                                                     
                   
         return profit
@@ -445,6 +522,21 @@ class moveLP:
                                                                      
                                                                              
         return profit
+    
+
+    # def meetDemandObjective(self):
+
+    #     for s in self.server_types:
+    #         for latency in get_known("latency_sensitivity"):
+
+    #             self.model += pulp.lpSum(
+    #                                         [
+                                                
+    #                                         ]
+    #                 )
+
+    #     pass
+    
     
     def solve(self):
         self.model.solve(self.solver)
