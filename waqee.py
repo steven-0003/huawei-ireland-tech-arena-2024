@@ -11,10 +11,20 @@ from utils import load_problem_data
 class moveLP:
 
 
-    def __init__(self, datacenters: dict[str, Datacenter], server_types: dict[str, Server], demand, timestep: int):
+    def __init__(   self,
+                    datacenters: dict[str, Datacenter],
+                    server_types: dict[str, Server],
+                    demand, timestep: int,
+                    predicted_demand: dict[str, Server] = None,
+                    lifetimes_left:dict[str, dict[str,int]] = None 
+                    ):
+        
         self.datacenters = datacenters
         self.server_types = server_types
         self.demand  = demand
+        self.predicted_demand = predicted_demand
+        self.lifetimes_left = lifetimes_left
+        
         self.timestep = timestep
 
         ## create model 
@@ -398,7 +408,7 @@ class moveLP:
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
                                     # <=
-                                    , sense=pulp.LpConstraintEQ
+                                    , sense=pulp.LpConstraintLE
                                     # ,self.demand[latency][s] 
                                     # -
                                     # sum( [ 
@@ -410,7 +420,24 @@ class moveLP:
                                 ,rhs=self.demand[latency][s]
                                 )
                 
-                econstraint = constraint.makeElasticSubProblem(-100,proportionFreeBound = 0)
+
+                datacenters = [dc for dc in self.datacenters.values() if dc.latency_sensitivity==latency]
+
+                energy_costs = [dc.cost_of_energy for dc in datacenters]
+
+                avg_cost_of_energy = sum(energy_costs)/len(energy_costs)
+
+                server = self.server_types[s]
+                profit = -server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * avg_cost_of_energy) )
+
+                lifetimes_left = [  self.lifetimes_left[dc.name][s] for dc in datacenters]
+                avg_lifetime_left = sum(lifetimes_left)/len(datacenters)
+
+                profit *= avg_lifetime_left##(server.life_expectancy*0.5)
+
+                profit *= ((self.demand[latency][s]+1)/(self.predicted_demand[latency][s]+1))
+
+                econstraint = constraint.makeElasticSubProblem(profit,proportionFreeBound = 0)
                 self.model.extend(econstraint)
                 
 
@@ -450,9 +477,16 @@ class moveLP:
        
         profit = server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy))
         profit = int(profit / server.life_expectancy)+1
-                                                                    
-                  
 
+
+        pred_demand =   self.predicted_demand[latency][server.name]                                  
+        demand =   self.demand[latency][server.name]
+
+        # if pred_demand<= demand:
+
+        demand_term =  (pred_demand-demand)/(pred_demand+demand)
+
+        profit *= demand_term
 
         return profit 
     
@@ -505,7 +539,10 @@ class moveLP:
         server = self.server_types[var_details[1]]
     
         profit = -server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy) )
-        profit *= (server.life_expectancy*0.75)
+
+        lifetime_left = self.lifetimes_left[datacenter.name][server.name]
+
+        profit *= lifetime_left ##(server.life_expectancy*0.5)
                                                                     
                   
         return profit

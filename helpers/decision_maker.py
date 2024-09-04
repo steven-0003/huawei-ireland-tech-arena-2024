@@ -177,6 +177,37 @@ class DecisionMaker(object):
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
     
     
+
+    """
+        returns a nested dictionary mapping datacentres to servers to the lifetime remaining of the oldest server of that type in that datacenter
+        e.g. lifetimes_left["DC1"]["CPU.S1"]== 24
+    """
+    def getLifetimesLeft(self)-> dict[str,dict[str,int]]:
+        
+        lifetimes_left = {}
+
+        for dc, datacenter in self.datacenters.items():
+
+            dc_lifetimes = {}
+
+            for s, server in self.server_types.items():
+                
+                if  len(datacenter.inventory[s]) == 0 :
+                    dc_lifetimes[s]=0
+                    
+
+                else:
+
+                    timestep_bought  = datacenter.inventory[s][0][0]
+                    dc_lifetimes[s] = server.life_expectancy - (self.timestep - timestep_bought)
+
+
+                
+            lifetimes_left[dc] = dc_lifetimes
+        
+        return lifetimes_left
+
+
     
     def getDemandCoeffs(self, datacenters: List[Datacenter]) -> dict[str,float]:
         energy_cost_sum = 0
@@ -224,6 +255,41 @@ class DecisionMaker(object):
 
         return demand_coefficients
     
+    def get_real_ahead_demand(self, lookahead:int) -> dict[str, dict[str, int]]:
+
+        demands = {}
+
+        for latency_sensitivity in get_known('latency_sensitivity'):
+
+                    ## get all data centers for this latency  
+                    dcs = self.getLatencyDataCenters(latency_sensitivity)
+                    
+                    ## dataframe of rows where t = current time step
+                    if self.timestep > get_known("time_steps") - (lookahead+1):
+                        ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)].copy()
+                    else:
+                        ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep+lookahead)].copy()
+
+
+                    latency_demands = {}
+
+                    ## for all servers
+                    for server in self.server_types.keys():
+                        
+                        server_demand_df = ts_demand.loc[(ts_demand['server_generation']==server) ].copy()
+                        if server_demand_df.empty:
+                            latency_demands[server] = 0
+                        else:
+                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+
+                            
+
+                        
+
+                    demands[latency_sensitivity] = latency_demands
+
+        return demands
+
 
     """
      Processes the demand from the csv
@@ -361,10 +427,17 @@ class DecisionMaker(object):
         demand_coeffs = self.get_all_demand_coefficients()
         #weighted_demand = self.getWeightedDemand(current_demand)
 
-        m = moveLP(self.datacenters,self.server_types,current_demand,self.timestep)
+        lifetimes_left = self.getLifetimesLeft()
+
+        m = moveLP(self.datacenters,
+                   self.server_types,
+                   current_demand,
+                   self.timestep,
+                    predicted_demand=self.get_real_ahead_demand(5),
+                    lifetimes_left=lifetimes_left)
         m.solve()
 
-        assert m.model.status == 1, "LINNEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION"
+        assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
         
         # ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
         # for datacenter in self.datacenters.values():
