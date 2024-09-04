@@ -165,7 +165,8 @@ class moveLP:
             self.addVariables[var].lowBound=0
             var_details = var.split("_")
             latency = self.datacenters[var_details[0]].latency_sensitivity
-            self.addVariables[var].upBound= self.demand[latency][var_details[1]] 
+            self.addVariables[var].upBound= int(self.datacenters[var_details[0]].slots_capacity
+                                                /self.server_types[var_details[1]].capacity)
 
 
         for var in self.removeVariables:
