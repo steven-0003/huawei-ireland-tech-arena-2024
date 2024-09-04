@@ -8,13 +8,15 @@ from helpers.server_type import Server
 from seeds import known_seeds
 from utils import load_problem_data
 
-class moveLP:
+class lifespanLP:
 
 
     def __init__(   self,
                     datacenters: dict[str, Datacenter],
                     server_types: dict[str, Server],
                     demand, timestep: int,
+                    p_max:float,
+                    L:float,
                     predicted_demand: dict[str, Server] = None,
                     lifetimes_left:dict[str, dict[str,int]] = None,
                     can_buy:bool = True,
@@ -28,12 +30,13 @@ class moveLP:
         self.predicted_demand = predicted_demand
         self.lifetimes_left = lifetimes_left
         self.can_buy  = can_buy
-        
+        self.max = p_max
+        self.L = L
         
         self.timestep = timestep
 
         ## create model 
-        self.model = pulp.LpProblem("moves", pulp.LpMaximize)
+        self.model = pulp.LpProblem("lifespan", pulp.LpMaximize)
         self.solver = pulp.PULP_CBC_CMD(msg=0)
 
    
@@ -379,7 +382,28 @@ class moveLP:
 
                             )
          
-    
+        self.model += (
+            pulp.lpSum(
+            [
+                self.getAddObjectiveCoeff(var) * self.addVariables[var] for var in self.addVariables
+            ]
+            +
+            [
+                self.getMoveObjectiveCoeff(var) * self.variables[var] for var in self.variables
+            ]
+            +
+            [
+                self.getRemoveObjectiveCoeff(var) * self.removeVariables[var] for var in self.removeVariables
+            ]
+            +
+            [
+                self.getHoldObjectiveCoeff(var) * self.holdVariables[var] for var in self.holdVariables
+            ]
+        )
+        >=
+        self.max
+        ,'More than profit'
+        )
 
 
 
@@ -447,6 +471,26 @@ class moveLP:
                 self.model.extend(econstraint)
                 
 
+                datacenters = [dc for dc in self.datacenters.values() if dc.latency_sensitivity==latency]
+
+                energy_costs = [dc.cost_of_energy for dc in datacenters]
+
+                avg_cost_of_energy = sum(energy_costs)/len(energy_costs)
+
+                server = self.server_types[s]
+                profit = -server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * avg_cost_of_energy) )
+
+                lifetimes_left = [  self.lifetimes_left[dc.name][s] for dc in datacenters]
+                avg_lifetime_left = sum(lifetimes_left)/len(datacenters)
+
+                profit *= avg_lifetime_left##(server.life_expectancy*0.5)
+
+                profit *= ((self.demand[latency][s]+1)/(self.predicted_demand[latency][s]+1))
+
+                econstraint = constraint.makeElasticSubProblem(profit,proportionFreeBound = 0)
+                self.model.extend(econstraint)
+                
+
         
 
 
@@ -456,23 +500,47 @@ class moveLP:
         
         self.model += pulp.lpSum(
             [
-                self.getAddObjectiveCoeff(var) * self.addVariables[var] for var in self.addVariables
+                self.lifespanAddCoeff(var) * self.addVariables[var] for var in self.addVariables
             ]
             +
             [
-                self.getMoveObjectiveCoeff(var) * self.variables[var] for var in self.variables
+                (1/self.server_types[var.split("_")[2]].life_expectancy)* self.variables[var] for var in self.variables
             ]
             +
             [
-                self.getRemoveObjectiveCoeff(var) * self.removeVariables[var] for var in self.removeVariables
+                self.lifespanRemoveCoeff(var) * self.removeVariables[var] for var in self.removeVariables
             ]
             +
             [
-                self.getHoldObjectiveCoeff(var) * self.holdVariables[var] for var in self.holdVariables
+                (1/self.server_types[var.split("_")[1]].life_expectancy) * self.holdVariables[var] for var in self.holdVariables
             ]
         )
 
+    def lifespanAddCoeff(self, var):
+        var_details = var.split("_")
+        server = self.server_types[var_details[1]]
+        total_s = 0
+        for dc in self.datacenters.values():
+            total_s += dc.getStockLevel()
+        new_L = (server.life_expectancy * self.L * total_s + 1)/(server.life_expectancy * total_s + server.life_expectancy)
+        return (new_L/self.L)/server.life_expectancy if self.L > 0 else 0
 
+    def lifespanRemoveCoeff(self, var):
+        var_details = var.split("_")
+        
+        datacenter = self.datacenters[var_details[0]]
+        server = self.server_types[var_details[1]]
+        if datacenter.getServerStock(server.name) == 0:
+            return 0
+        s_remove = datacenter.inventory[var_details[1]][0]
+        lifespan = (self.timestep - s_remove[0])/server.life_expectancy
+
+        total_s = 0
+        for dc in self.datacenters.values():
+            total_s += dc.getStockLevel()
+
+        new_L = (self.L * total_s - lifespan)/(total_s - 1)
+        return (new_L/self.L)/server.life_expectancy if self.L > 0 else 0
 
     def getAddObjectiveCoeff(self, var):
         var_details = var.split("_")

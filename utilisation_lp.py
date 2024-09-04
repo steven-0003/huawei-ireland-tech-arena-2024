@@ -8,13 +8,14 @@ from helpers.server_type import Server
 from seeds import known_seeds
 from utils import load_problem_data
 
-class moveLP:
+class utilisationLP:
 
 
     def __init__(   self,
                     datacenters: dict[str, Datacenter],
                     server_types: dict[str, Server],
                     demand, timestep: int,
+                    p_max: float,
                     predicted_demand: dict[str, Server] = None,
                     lifetimes_left:dict[str, dict[str,int]] = None,
                     can_buy:bool = True,
@@ -28,12 +29,12 @@ class moveLP:
         self.predicted_demand = predicted_demand
         self.lifetimes_left = lifetimes_left
         self.can_buy  = can_buy
-        
+        self.max_profit = p_max
         
         self.timestep = timestep
 
         ## create model 
-        self.model = pulp.LpProblem("moves", pulp.LpMaximize)
+        self.model = pulp.LpProblem("utilisation", pulp.LpMaximize)
         self.solver = pulp.PULP_CBC_CMD(msg=0)
 
    
@@ -378,6 +379,29 @@ class moveLP:
                                     , t + " Slots Taken Do Not Exceed Capacity Constraint"
 
                             )
+                
+        self.model += (
+        pulp.lpSum(
+            [
+                self.getAddObjectiveCoeff(var) * self.addVariables[var] for var in self.addVariables
+            ]
+            +
+            [
+                self.getMoveObjectiveCoeff(var) * self.variables[var] for var in self.variables
+            ]
+            +
+            [
+                self.getRemoveObjectiveCoeff(var) * self.removeVariables[var] for var in self.removeVariables
+            ]
+            +
+            [
+                self.getHoldObjectiveCoeff(var) * self.holdVariables[var] for var in self.holdVariables
+            ]
+        )
+        >=
+        self.max_profit,
+        "Must be more than max profit"
+        )
          
     
 
@@ -453,24 +477,27 @@ class moveLP:
 
     def createObjective(self):
          
-        
-        self.model += pulp.lpSum(
-            [
-                self.getAddObjectiveCoeff(var) * self.addVariables[var] for var in self.addVariables
-            ]
-            +
-            [
-                self.getMoveObjectiveCoeff(var) * self.variables[var] for var in self.variables
-            ]
-            +
-            [
-                self.getRemoveObjectiveCoeff(var) * self.removeVariables[var] for var in self.removeVariables
-            ]
-            +
-            [
-                self.getHoldObjectiveCoeff(var) * self.holdVariables[var] for var in self.holdVariables
-            ]
-        )
+        for s in self.server_types:
+            for latency in get_known('latency_sensitivity'):
+                self.model += pulp.lpSum(
+                    [
+                        self.server_types[var.split("_")[1]].capacity * self.addVariables[var] for var in self.addVariables
+                        if self.datacenters[var.split("_")[0]].latency_sensitivity==latency
+                        and var.split("_")[1] == s
+                    ]
+                    +
+                    [
+                        self.server_types[var.split("_")[2]].capacity * self.variables[var] for var in self.variables
+                        if self.datacenters[var.split("_")[1]].latency_sensitivity==latency 
+                        and var.split("_")[2] == s
+                    ]
+                    +
+                    [
+                        self.server_types[var.split("_")[1]].capacity * self.holdVariables[var] for var in self.holdVariables
+                        if self.datacenters[var.split("_")[0]].latency_sensitivity==latency
+                        and var.split("_")[1] == s
+                    ]
+                )
 
 
 
@@ -629,4 +656,3 @@ def get_demand(demand, timestep: int):
 #     print(var + ": " + str(m.removeVariables[var].varValue))
 # for var in m.variables:
 #     print(var + ": " + str(m.variables[var].varValue))
-

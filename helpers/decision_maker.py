@@ -11,6 +11,8 @@ import ast
 import linear_programming
 
 from waqee import moveLP
+from lifespan_lp import lifespanLP
+from utilisation_lp import utilisationLP
 
 from statsmodels.tsa.api import Holt
 import warnings
@@ -322,31 +324,32 @@ class DecisionMaker(object):
                         if server_demand_df.empty:
                             latency_demands[server] = 0
                         else:
-                            ## demand for the server generation at this latency for all timesteps <= current timestep
-                            server_demand =  self.demand.loc[(self.demand['server_generation'] == server)
-                                                             & (self.demand['time_step'] <= self.timestep)].copy()
-                            ls_demand = server_demand[['time_step', latency_sensitivity]].copy()
-                            endog = ls_demand[latency_sensitivity].to_numpy()
+                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+                            # ## demand for the server generation at this latency for all timesteps <= current timestep
+                            # server_demand =  self.demand.loc[(self.demand['server_generation'] == server)
+                            #                                  & (self.demand['time_step'] <= self.timestep)].copy()
+                            # ls_demand = server_demand[['time_step', latency_sensitivity]].copy()
+                            # endog = ls_demand[latency_sensitivity].to_numpy()
                             
-                            ## If we have demand for only one timestep, use the actual demand
-                            if len(endog)==1:
-                                latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
-                                continue
+                            # ## If we have demand for only one timestep, use the actual demand
+                            # if len(endog)==1:
+                            #     latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+                            #     continue
                             
                             ## Apply holt's damped smoothing to the demand
-                            np.seterr(divide='ignore')
-                            fit = Holt(endog, damped_trend=True, initialization_method="estimated").fit(
-                                    smoothing_level=0.2, smoothing_trend=0.12, 
-                                )
-                            d = fit.fittedvalues
+                            # np.seterr(divide='ignore')
+                            # fit = Holt(endog, damped_trend=True, initialization_method="estimated").fit(
+                            #         smoothing_level=0.2, smoothing_trend=0.12, 
+                            #     )
+                            # d = fit.fittedvalues
 
-                            ## In some cases such as holt's, it will produce negative values, so just set it to 0
-                            ## TODO: Deal with this in a better way. boxcox parameter in Holt can potentially be used
-                            d[d<0] = 0
-                            f = fit.forecast(1)
-                            f[f<0] = 0
-                            latency_demands[server] = int(np.average(f) * (10/9))
-                            np.seterr(divide='warn')
+                            # ## In some cases such as holt's, it will produce negative values, so just set it to 0
+                            # ## TODO: Deal with this in a better way. boxcox parameter in Holt can potentially be used
+                            # d[d<0] = 0
+                            # f = fit.forecast(1)
+                            # f[f<0] = 0
+                            # latency_demands[server] = int(np.average(f) * (10/9))
+                            # np.seterr(divide='warn')
 
                     demands[latency_sensitivity] = latency_demands
 
@@ -446,7 +449,34 @@ class DecisionMaker(object):
                     can_buy= self.canBuy,
                     
                 )
-        m.solve()
+        p = m.solve()
+
+        # FIXME: Lifespan solver - DOES NOT EXECUTE
+        # m = lifespanLP(self.datacenters,
+        #            self.server_types,
+        #            current_demand,
+        #            self.timestep,
+        #            p,
+        #            self.calculateLifespanAtTimestep(self.timestep),
+        #             predicted_demand=self.get_real_ahead_demand(5),
+        #             lifetimes_left=lifetimes_left,
+        #             can_buy= self.canBuy,
+
+        # )
+        # m.solve()
+
+        # FIXME: Utilisation solver
+        # m = utilisationLP(self.datacenters,
+        #            self.server_types,
+        #            current_demand,
+        #            self.timestep,
+        #            p,
+        #             predicted_demand=self.get_real_ahead_demand(5),
+        #             lifetimes_left=lifetimes_left,
+        #             can_buy= self.canBuy,
+
+        # )
+        # m.solve()
 
         assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
         
@@ -647,9 +677,9 @@ class DecisionMaker(object):
 
         for datacenter in self.datacenters.values():
             for server_type, server_list in datacenter.inventory.items():
-                for deployed_time in server_list:
-                    server = self.server_types[server_type]
-                    lifespan_sum += deployed_time / server.life_expectancy
+                for server in server_list:
+                    lifespan = timestep - server[0]
+                    lifespan_sum += lifespan / self.server_types[server_type].life_expectancy
                     total_servers += 1
 
         return lifespan_sum / total_servers if total_servers > 0 else 0 # If there are no pairs, return 0 to avoid division by zero.

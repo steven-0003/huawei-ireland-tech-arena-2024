@@ -4,33 +4,33 @@ from evaluation import evaluation_function
 from seeds import known_seeds
 import statistics
 
-seeds = known_seeds('test')
+def evaluate(path=None):
+    seeds = known_seeds('test')
+    if path==None:
+        path = './'
+    scores = []
+    for seed in seeds:
+        print(f"SEED: #{seed}")
+        # LOAD SOLUTION
+        solution = load_solution(f'{path}output/{seed}.json')
 
-scores = []
+        # LOAD PROBLEM DATA
+        demand, datacenters, servers, selling_prices = load_problem_data(path=f'{path}data')
+
+        # EVALUATE THE SOLUTION
+        score = evaluation_function(solution,
+                                    demand,
+                                    datacenters,
+                                    servers,
+                                    selling_prices,
+                                    seed=seed,
+                                    verbose=1)
+        scores.append(score)
+        print(f'Solution score: {score}')
+
+    print(f'Average solution score: {statistics.mean(scores)}')
+    return statistics.mean(scores)
 
 
-
-for seed in seeds:
-
-    
-    print(f"SEED: #{seed}")
-    
-
-    # LOAD SOLUTION
-    solution = load_solution(f'./output/{seed}.json')
-
-    # LOAD PROBLEM DATA
-    demand, datacenters, servers, selling_prices = load_problem_data()
-
-    # EVALUATE THE SOLUTION
-    score = evaluation_function(solution,
-                                demand,
-                                datacenters,
-                                servers,
-                                selling_prices,
-                                seed=seed,
-                                verbose=1)
-    scores.append(score)
-    print(f'Solution score: {score}')
-
-print(f'Average solution score: {statistics.mean(scores)}')
+if __name__ == "__main__":
+    evaluate()
