@@ -37,6 +37,8 @@ class DecisionMaker(object):
         self.id = 0
         self.timestep = 0
         self.canBuy = True
+        
+
         self.solution = []
 
     def generateUniqueId(self) -> str:
@@ -208,6 +210,10 @@ class DecisionMaker(object):
         return lifetimes_left
 
 
+
+    def getCanBuys(self):
+
+        pass
     
     def getDemandCoeffs(self, datacenters: List[Datacenter]) -> dict[str,float]:
         energy_cost_sum = 0
@@ -330,7 +336,7 @@ class DecisionMaker(object):
                             ## Apply holt's damped smoothing to the demand
                             np.seterr(divide='ignore')
                             fit = Holt(endog, damped_trend=True, initialization_method="estimated").fit(
-                                    smoothing_level=0.15, smoothing_trend=0.1, 
+                                    smoothing_level=0.2, smoothing_trend=0.12, 
                                 )
                             d = fit.fittedvalues
 
@@ -418,12 +424,14 @@ class DecisionMaker(object):
 
         if self.timestep >= get_known('time_steps')-35:
             self.canBuy = False
+
+        
         
         self.checkConstraints()
 
 
         ## PROCESS DEMAND FROM CSV
-        current_demand = self.processDemand()
+        current_demand = self.get_real_ahead_demand(0)##self.processDemand()
         demand_coeffs = self.get_all_demand_coefficients()
         #weighted_demand = self.getWeightedDemand(current_demand)
 
@@ -434,7 +442,10 @@ class DecisionMaker(object):
                    current_demand,
                    self.timestep,
                     predicted_demand=self.get_real_ahead_demand(5),
-                    lifetimes_left=lifetimes_left)
+                    lifetimes_left=lifetimes_left,
+                    can_buy= self.canBuy,
+                    
+                )
         m.solve()
 
         assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
@@ -454,11 +465,16 @@ class DecisionMaker(object):
         
         # self.moveServers()
 
+        adds, removes, moves = 0,0,0 
+
         for moveVar in m.variables:
             details = moveVar.split("_")
             from_dc = details[0]
             to_dc = details[1]
             s = details[2]
+
+            moves += m.variables[moveVar].varValue
+
             for _ in range(int(m.variables[moveVar].varValue)):
                 server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
                 self.addToSolution(self.timestep, to_dc, s, server_id, "move")
@@ -467,29 +483,34 @@ class DecisionMaker(object):
             details = removeVar.split("_")
             dc = details[0]
             s = details[1]
+
+            removes += m.removeVariables[removeVar].varValue
+
             self.sellServers(self.datacenters[dc], s, int(m.removeVariables[removeVar].varValue))
         
-        if self.canBuy:
-            for addVar in m.addVariables:
-                details = addVar.split("_")
-                dc = details[0]
-                s = details[1]
+        # if self.canBuy:
+        for addVar in m.addVariables:
+            details = addVar.split("_")
+            dc = details[0]
+            s = details[1]
 
-                # ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)
-                #                             & (self.demand['server_generation']==s)].copy()
-                # s_demand = 0
-                # if not ts_demand.empty:
-                #     s_demand = (ts_demand.iloc[0][self.datacenters[dc].latency_sensitivity] * 
-                #                 demand_coeffs[self.datacenters[dc].latency_sensitivity][self.datacenters[dc].name])
-                
-                # actual = int((s_demand - 
-                #               (len(self.datacenters[dc].inventory[s]) * self.server_types[s].capacity))
-                #               //self.server_types[s].capacity)
+            adds += m.addVariables[addVar].varValue
 
-                # if actual < 0:
-                #     actual = 0
-                #self.buyServers(self.datacenters[dc], s, min(actual, int(m.addVariables[addVar].varValue)))
-                self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
+            # ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)
+            #                             & (self.demand['server_generation']==s)].copy()
+            # s_demand = 0
+            # if not ts_demand.empty:
+            #     s_demand = (ts_demand.iloc[0][self.datacenters[dc].latency_sensitivity] * 
+            #                 demand_coeffs[self.datacenters[dc].latency_sensitivity][self.datacenters[dc].name])
+            
+            # actual = int((s_demand - 
+            #               (len(self.datacenters[dc].inventory[s]) * self.server_types[s].capacity))
+            #               //self.server_types[s].capacity)
+
+            # if actual < 0:
+            #     actual = 0
+            #self.buyServers(self.datacenters[dc], s, min(actual, int(m.addVariables[addVar].varValue)))
+            self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
 
         
         # ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
@@ -505,7 +526,7 @@ class DecisionMaker(object):
         #                 self.buyServers(datacenter,server,add_amount)
 
            
-            
+        print(f"ADDS: {adds}  REMOVES: {removes}  MOVES: {moves}")
 
 
 

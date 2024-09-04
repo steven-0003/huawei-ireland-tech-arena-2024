@@ -16,7 +16,10 @@ class moveLP:
                     server_types: dict[str, Server],
                     demand, timestep: int,
                     predicted_demand: dict[str, Server] = None,
-                    lifetimes_left:dict[str, dict[str,int]] = None 
+                    lifetimes_left:dict[str, dict[str,int]] = None,
+                    can_buy:bool = True,
+                    
+
                     ):
         
         self.datacenters = datacenters
@@ -24,6 +27,8 @@ class moveLP:
         self.demand  = demand
         self.predicted_demand = predicted_demand
         self.lifetimes_left = lifetimes_left
+        self.can_buy  = can_buy
+        
         
         self.timestep = timestep
 
@@ -67,7 +72,7 @@ class moveLP:
                                                             for dc_from in self.datacenters.values()
                                                                 for dc_to in self.datacenters.values()
                                                                     for server in self.server_types.values()
-                                                            if dc_from != dc_to
+                                                            if dc_from != dc_to and dc_from.latency_sensitivity!=dc_to.latency_sensitivity
                                                         ],
                                                     
                                                     cat = "Integer"
@@ -80,7 +85,8 @@ class moveLP:
                 (dc.name+"_"+server.name) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                if server.canBeDeployed(self.timestep)
+                if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity)##self.can_buy
+
             ],
 
             cat="Integer"
@@ -484,7 +490,7 @@ class moveLP:
 
         # if pred_demand<= demand:
 
-        demand_term =  (pred_demand-demand)/(pred_demand+demand)
+        demand_term =  (pred_demand-demand+1)/(pred_demand+demand+1)
 
         profit *= demand_term
 
@@ -528,6 +534,10 @@ class moveLP:
                             - 
                             int((server.cost_of_moving / (server.life_expectancy*0.5))+1)
                     ) 
+        
+
+
+
                     
         return profit 
 
@@ -543,7 +553,8 @@ class moveLP:
         lifetime_left = self.lifetimes_left[datacenter.name][server.name]
 
         profit *= lifetime_left ##(server.life_expectancy*0.5)
-                                                                    
+
+                                         
                   
         return profit
 

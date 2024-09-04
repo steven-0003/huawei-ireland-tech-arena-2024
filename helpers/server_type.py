@@ -1,6 +1,8 @@
 
 from typing import Dict
 
+from evaluation import get_known
+
 
 class Server(object):
     def __init__(self, name: str, release_time: list[int], purchase_price: float, slots_size: int, 
@@ -26,8 +28,14 @@ class Server(object):
         return(cur_timestep >= self.release_time[0] and cur_timestep <= self.release_time[1])
 
 
+    def isProfitable(self, timestep, latency):
+        
+        return get_known("time_steps")- self.getTimeTillProfitable(latency_sensitivity=latency) > timestep
+            
+        
+
     def getTimeTillProfitable(self, latency_sensitivity):
 
-        k = 8
+        k = 25
 
-        return  self.purchase_price /  (self.selling_prices[latency_sensitivity] * self.life_expectancy) + k
+        return  (self.purchase_price /  (self.selling_prices[latency_sensitivity] * self.capacity)) + k
