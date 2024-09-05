@@ -85,7 +85,7 @@ class moveLP:
                 (dc.name+"_"+server.name) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity)##self.can_buy
+                if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity) and self.timestep%2==1##self.can_buy
 
             ],
 
@@ -311,7 +311,7 @@ class moveLP:
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
                                     <=
-                                    self.demand[latency][s] * 1.1
+                                    self.demand[latency][s] * 1.5
                                     # -
                                     # sum( [ 
                                     #                                 dc.getServerStock(s)*self.server_types[s].capacity
@@ -406,9 +406,9 @@ class moveLP:
                                                     for var in self.addVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
 
-                                            +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
-                                                    for var in self.removeVariables  
-                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                            #         for var in self.removeVariables  
+                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
                                             +
                                                 [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.holdVariables
@@ -440,9 +440,17 @@ class moveLP:
                 lifetimes_left = [  self.lifetimes_left[dc.name][s] for dc in datacenters]
                 avg_lifetime_left = sum(lifetimes_left)/len(datacenters)
 
-                profit *= avg_lifetime_left##(server.life_expectancy*0.5)
+                lifetime_coeff = 1- (avg_lifetime_left/server.life_expectancy)
+
+                profit *= lifetime_coeff
+
+
+                profit *= 0.05  ## PARAMETER TO SET ??
+                
 
                 profit *= ((self.demand[latency][s]+1)/(self.predicted_demand[latency][s]+1))
+
+                
 
                 econstraint = constraint.makeElasticSubProblem(profit,proportionFreeBound = 0)
                 self.model.extend(econstraint)
@@ -489,11 +497,13 @@ class moveLP:
         pred_demand =   self.predicted_demand[latency][server.name]                                  
         demand =   self.demand[latency][server.name]
 
-        # if pred_demand<= demand:
+        
 
         demand_term =  (pred_demand-demand+1)/(pred_demand+demand+1)
 
         profit *= demand_term
+
+        
 
         return profit 
     
@@ -592,12 +602,14 @@ class moveLP:
         latency = datacenter.latency_sensitivity
         server = self.server_types[var_details[1]]
     
-        profit = -server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy) )
+        profit = -(server.selling_prices[latency] * server.capacity - ( (server.energy_consumption * datacenter.cost_of_energy) ))
 
         lifetime_left = self.lifetimes_left[datacenter.name][server.name]
+        lifetime_coeff = lifetime_left/server.life_expectancy
 
-        profit *= lifetime_left ##(server.life_expectancy*0.5)
+        profit *= lifetime_coeff##lifetime_left ##(server.life_expectancy*0.5)
 
+        
                                          
                   
         return profit
