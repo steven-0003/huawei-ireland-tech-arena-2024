@@ -311,7 +311,7 @@ class moveLP:
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
                                     <=
-                                    self.demand[latency][s] * 1.05
+                                    self.demand[latency][s] * 1.1
                                     # -
                                     # sum( [ 
                                     #                                 dc.getServerStock(s)*self.server_types[s].capacity
@@ -406,9 +406,9 @@ class moveLP:
                                                     for var in self.addVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
 
-                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
-                                            #         for var in self.removeVariables  
-                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                            +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
+                                                    for var in self.removeVariables  
+                                                    if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
                                             +
                                                 [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.holdVariables
@@ -502,45 +502,88 @@ class moveLP:
     
     def getMoveObjectiveCoeff(self, var):
         var_details = var.split("_")
-        
-        datacenter = self.datacenters[var_details[1]]
-        latency = datacenter.latency_sensitivity
+
         server = self.server_types[var_details[2]]
 
-        from_datacenter = self.datacenters[var_details[0]]
-        from_latency=  from_datacenter.latency_sensitivity
 
-        avg =             (  ((   
-                                server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
-                                
-                            )
-                            -
-                            (   
-                                server.selling_prices[from_latency] * server.capacity -  (server.energy_consumption * from_datacenter.cost_of_energy)  
-                                
-                            ))
-                            /2)
 
-        profit =    (       
-                            avg+
-                            (   
-                                server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
+        from_dc = self.datacenters[var_details[0]]
+        to_dc = self.datacenters[var_details[1]]
+        
+
+        from_latency_dcs = [dc for dc in self.datacenters.values() if dc.latency_sensitivity == from_dc.latency_sensitivity ]
+        from_demand_met =  sum([ dc.getServerStock(server.name)*server.capacity  for dc in from_latency_dcs])
+
+        to_latency_dcs = [dc for dc in self.datacenters.values() if dc.latency_sensitivity==to_dc.latency_sensitivity ]
+        to_demand_met = sum( [dc.getServerStock(server.name)*server.capacity for dc in to_latency_dcs ] )
+
+        
+        ## account for demand of the latency we are transferring to 
+        ## as well as the demand of the latency we are moving from 
+        from_total_demand = self.demand[from_dc.latency_sensitivity][server.name]
+        to_total_demand = self.demand[to_dc.latency_sensitivity][server.name]
+
+        from_demand_coeff = (from_demand_met-from_total_demand+1)/(from_demand_met+from_total_demand+1)
+        to_demand_coeff = (to_total_demand-to_demand_met+1)/(to_total_demand+to_demand_met+1)
+
+        demand_coeff = min(from_demand_coeff,to_demand_coeff)
+        
+        from_profit = (server.selling_prices[from_dc.latency_sensitivity]*server.capacity)- (server.energy_consumption*from_dc.cost_of_energy)
+        to_profit = (server.selling_prices[to_dc.latency_sensitivity]*server.capacity) - (server.energy_consumption*to_dc.cost_of_energy)
+
+        ## percentage profit increase
+        profit_increase = (to_profit+1)/(from_profit+1)
+
+        profit = to_profit * profit_increase * demand_coeff 
+
+        ## add score increase from add obj func, to make sure move is always more favourable than add
+        profit += (server.selling_prices[to_dc.latency_sensitivity] * server.capacity - ( (server.energy_consumption * to_dc.cost_of_energy)))
+
+        return profit 
+
+
+
+        # datacenter = self.datacenters[var_details[1]]
+        # latency = datacenter.latency_sensitivity
+        # server = self.server_types[var_details[2]]
+
+        # from_datacenter = self.datacenters[var_details[0]]
+        # from_latency=  from_datacenter.latency_sensitivity
+
+        
+
+
+        # avg =             (  ((   
+        #                         server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
                                 
-                            )
-                            -
-                            (   
-                                server.selling_prices[from_latency] * server.capacity -  (server.energy_consumption * from_datacenter.cost_of_energy)  
+        #                     )
+        #                     -
+        #                     (   
+        #                         server.selling_prices[from_latency] * server.capacity -  (server.energy_consumption * from_datacenter.cost_of_energy)  
                                 
-                            )
-                            - 
-                            int((server.cost_of_moving / (server.life_expectancy*0.5))+1)
-                    ) 
+        #                     ))
+        #                     /2)
+
+        # profit =    (       
+        #                     avg+
+        #                     (   
+        #                         server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)  
+                                
+        #                     )
+        #                     -
+        #                     (   
+        #                         server.selling_prices[from_latency] * server.capacity -  (server.energy_consumption * from_datacenter.cost_of_energy)  
+                                
+        #                     )
+        #                     - 
+        #                     int((server.cost_of_moving / (server.life_expectancy*0.5))+1)
+        #             ) 
         
 
 
 
                     
-        return profit 
+        # return profit 
 
     def getRemoveObjectiveCoeff(self, var):
         var_details = var.split("_")

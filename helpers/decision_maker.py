@@ -441,7 +441,7 @@ class DecisionMaker(object):
                    self.server_types,
                    current_demand,
                    self.timestep,
-                    predicted_demand=self.get_real_ahead_demand(5),
+                    predicted_demand=self.get_real_ahead_demand(28),
                     lifetimes_left=lifetimes_left,
                     can_buy= self.canBuy,
                     
