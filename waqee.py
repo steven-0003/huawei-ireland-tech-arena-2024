@@ -445,7 +445,7 @@ class moveLP:
                 profit *= lifetime_coeff
 
 
-                profit *= 0.05  ## PARAMETER TO SET ??
+                profit *= 0.2  ## PARAMETER TO SET ??
                 
 
                 profit *= ((self.demand[latency][s]+1)/(self.predicted_demand[latency][s]+1))
@@ -621,9 +621,12 @@ class moveLP:
         latency = datacenter.latency_sensitivity
         server = self.server_types[var_details[1]]
 
+        lifetime_left = self.lifetimes_left[datacenter.name][server.name]
+        lifetime_coeff = lifetime_left/server.life_expectancy
 
-        profit = server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy)
-                                                                     
+
+        profit = server.selling_prices[latency] * server.capacity -  (server.energy_consumption * datacenter.cost_of_energy * (1-lifetime_coeff))
+                                                             
                                                                              
         return profit
     
