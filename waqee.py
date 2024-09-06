@@ -16,6 +16,7 @@ class moveLP:
                     server_types: dict[str, Server],
                     demand, timestep: int,
                     p,
+                    buyOnce,
                     predicted_demand: dict[str, Server] = None,
                     lifetimes_left:dict[str, dict[str,int]] = None,
                     can_buy:bool = True,
@@ -30,6 +31,7 @@ class moveLP:
         self.lifetimes_left = lifetimes_left
         self.can_buy  = can_buy
         self.p = p
+        self.buyOnce = buyOnce
         
         
         self.timestep = timestep
@@ -87,7 +89,7 @@ class moveLP:
                 (dc.name+"_"+server.name) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity) and self.timestep%2==1##self.can_buy
+                if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity) and (self.timestep%2==1 or self.buyOnce)##self.can_buy
 
             ],
 
@@ -313,7 +315,7 @@ class moveLP:
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
                                     <=
-                                    self.demand[latency][s] * 1.5
+                                    self.demand[latency][s] * 2
                                     # -
                                     # sum( [ 
                                     #                                 dc.getServerStock(s)*self.server_types[s].capacity

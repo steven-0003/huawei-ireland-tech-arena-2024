@@ -39,6 +39,17 @@ class DecisionMaker(object):
                     2281: 0.21,
                     4363: 0.2,
                     5693: 0.29}
+        
+        self.buyOnce = {2311: False,
+                    3329: True,
+                    4201: False,
+                    8761: False,
+                    2663: False,
+                    4507: True,
+                    6247: False,
+                    2281: False,
+                    4363: False,
+                    5693: False}
 
 
         self.k = {2311: 32,
@@ -476,11 +487,13 @@ class DecisionMaker(object):
         lookahead = 20 if self.seed not in self.lookaheads.keys() else self.lookaheads[self.seed]
         
         p = 0.2 if self.seed not in self.p.keys() else self.p[self.seed]
+        buyOnce = False if self.seed not in self.buyOnce.keys() else self.buyOnce[self.seed]
         m = moveLP(self.datacenters,
                    self.server_types,
                    current_demand,
                    self.timestep,
                    p,
+                   buyOnce,
                     predicted_demand=self.get_real_ahead_demand(lookahead),
                     lifetimes_left=lifetimes_left,
                     can_buy= self.canBuy,
