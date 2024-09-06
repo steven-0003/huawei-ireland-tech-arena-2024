@@ -15,6 +15,7 @@ class moveLP:
                     datacenters: dict[str, Datacenter],
                     server_types: dict[str, Server],
                     demand, timestep: int,
+                    p,
                     predicted_demand: dict[str, Server] = None,
                     lifetimes_left:dict[str, dict[str,int]] = None,
                     can_buy:bool = True,
@@ -28,6 +29,7 @@ class moveLP:
         self.predicted_demand = predicted_demand
         self.lifetimes_left = lifetimes_left
         self.can_buy  = can_buy
+        self.p = p
         
         
         self.timestep = timestep
@@ -445,7 +447,7 @@ class moveLP:
                 profit *= lifetime_coeff
 
 
-                profit *= 0.2  ## PARAMETER TO SET ??
+                profit *= self.p  ## PARAMETER TO SET ??
                 
 
                 profit *= ((self.demand[latency][s]+1)/(self.predicted_demand[latency][s]+1))

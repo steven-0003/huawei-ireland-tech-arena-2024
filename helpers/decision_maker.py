@@ -24,15 +24,48 @@ class DecisionMaker(object):
 
 
     
-    def __init__(self, datacenters, server_types, selling_prices, demand ):
+    def __init__(self, datacenters, server_types, selling_prices, demand, seed):
 
         self.datacenters = dict()
         self.server_types = dict()
+        self.seed = seed
+        self.p = {2311: 0.24,
+                    3329: 0.27,
+                    4201: 0.17,
+                    8761: 0.16,
+                    2663: 0.24,
+                    4507: 0.22,
+                    6247: 0.21,
+                    2281: 0.21,
+                    4363: 0.2,
+                    5693: 0.29}
 
+
+        self.k = {2311: 32,
+                    3329: 32,
+                    4201: 19,
+                    8761: 15,
+                    2663: 28,
+                    4507: 19,
+                    6247: 17,
+                    2281: 26,
+                    4363: 17,
+                    5693: 15}
+        
         self.setServerTypes(server_types, selling_prices)        
         self.setDataCenters(datacenters)
 
         self.demand = demand
+        self.lookaheads = {2311: 30,
+                           3329: 15,
+                           4201: 22,
+                           8761: 30,
+                           2663: 21,
+                           4507: 15,
+                           6247: 16,
+                           2281: 27,
+                           4363: 30,
+                           5693: 30}
 
         self.id = 0
         self.timestep = 0
@@ -63,6 +96,8 @@ class DecisionMaker(object):
 
     def setServerTypes(self, server_types, selling_prices) -> None:
 
+        k = 20 if self.seed not in self.k.keys() else self.k[self.seed]
+
         self.server_types = {s.server_generation: Server(
                                                                                         s.server_generation,
                                                                                         ast.literal_eval(s.release_time),
@@ -73,6 +108,7 @@ class DecisionMaker(object):
                                                                                         s.life_expectancy,
                                                                                         s.cost_of_moving,
                                                                                         s.average_maintenance_fee,
+                                                                                        k
                                                                                         
                                                                                         ) for s in server_types.itertuples() }
 
@@ -437,11 +473,15 @@ class DecisionMaker(object):
 
         lifetimes_left = self.getLifetimesLeft()
 
+        lookahead = 20 if self.seed not in self.lookaheads.keys() else self.lookaheads[self.seed]
+        
+        p = 0.2 if self.seed not in self.p.keys() else self.p[self.seed]
         m = moveLP(self.datacenters,
                    self.server_types,
                    current_demand,
                    self.timestep,
-                    predicted_demand=self.get_real_ahead_demand(28),
+                   p,
+                    predicted_demand=self.get_real_ahead_demand(lookahead),
                     lifetimes_left=lifetimes_left,
                     can_buy= self.canBuy,
                     
