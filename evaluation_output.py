@@ -4,10 +4,18 @@ from evaluation import evaluation_function
 from seeds import known_seeds
 import statistics
 
-seeds = known_seeds('training')
+seeds = known_seeds('test')
 
 scores = []
+
+
+
 for seed in seeds:
+
+    
+    print(f"SEED: #{seed}")
+    
+
     # LOAD SOLUTION
     solution = load_solution(f'./output/{seed}.json')
 

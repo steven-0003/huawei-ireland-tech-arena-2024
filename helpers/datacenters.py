@@ -61,12 +61,12 @@ class Datacenter(object):
 
         server = seller.inventory[server_type].pop()
         seller.inventory_level -= self.server_types[server_type].slots_size
-        seller.removing_servers[server_type] -= 1
+        #seller.removing_servers[server_type] -= 1
 
         self.inventory[server_type].append(server)
         self.inventory[server_type].sort(key=lambda x: x[0])
         self.inventory_level += self.server_types[server_type].slots_size
-        self.adding_servers[server_type] -= 1
+        #self.adding_servers[server_type] -= 1
 
         return server[1]
 

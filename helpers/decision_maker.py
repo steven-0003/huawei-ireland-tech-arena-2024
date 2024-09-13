@@ -1,12 +1,21 @@
 import math
+import time
 from typing import List
 import pandas as pd
+import numpy as np
 from evaluation import get_known
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
 import ast
 import linear_programming
+
+from waqee import moveLP
+
+from statsmodels.tsa.api import Holt
+import warnings
+from statsmodels.tools.sm_exceptions import ConvergenceWarning
+warnings.simplefilter('ignore', ConvergenceWarning)
 
 
 class DecisionMaker(object):
@@ -15,19 +24,65 @@ class DecisionMaker(object):
 
 
     
-    def __init__(self, datacenters, server_types, selling_prices, demand ):
+    def __init__(self, datacenters, server_types, selling_prices, demand, seed):
 
         self.datacenters = dict()
         self.server_types = dict()
+        self.seed = seed
+        self.p = {2311: 0.24,
+                    3329: 0.27,
+                    4201: 0.17,
+                    8761: 0.16,
+                    2663: 0.24,
+                    4507: 0.22,
+                    6247: 0.21,
+                    2281: 0.21,
+                    4363: 0.2,
+                    5693: 0.29}
+        
+        self.buyOnce = {2311: False,
+                    3329: True,
+                    4201: False,
+                    8761: False,
+                    2663: False,
+                    4507: True,
+                    6247: False,
+                    2281: False,
+                    4363: False,
+                    5693: False}
 
+
+        self.k = {2311: 32,
+                    3329: 32,
+                    4201: 19,
+                    8761: 15,
+                    2663: 28,
+                    4507: 19,
+                    6247: 17,
+                    2281: 26,
+                    4363: 17,
+                    5693: 15}
+        
         self.setServerTypes(server_types, selling_prices)        
         self.setDataCenters(datacenters)
 
         self.demand = demand
+        self.lookaheads = {2311: 30,
+                           3329: 15,
+                           4201: 22,
+                           8761: 30,
+                           2663: 21,
+                           4507: 15,
+                           6247: 16,
+                           2281: 27,
+                           4363: 30,
+                           5693: 30}
 
         self.id = 0
         self.timestep = 0
         self.canBuy = True
+        
+
         self.solution = []
 
     def generateUniqueId(self) -> str:
@@ -52,6 +107,8 @@ class DecisionMaker(object):
 
     def setServerTypes(self, server_types, selling_prices) -> None:
 
+        k = 20 if self.seed not in self.k.keys() else self.k[self.seed]
+
         self.server_types = {s.server_generation: Server(
                                                                                         s.server_generation,
                                                                                         ast.literal_eval(s.release_time),
@@ -62,6 +119,7 @@ class DecisionMaker(object):
                                                                                         s.life_expectancy,
                                                                                         s.cost_of_moving,
                                                                                         s.average_maintenance_fee,
+                                                                                        k
                                                                                         
                                                                                         ) for s in server_types.itertuples() }
 
@@ -87,7 +145,7 @@ class DecisionMaker(object):
 
     
 
-    def buyServers(self, datacenter: str, server_type: str, quantity: int) -> None:
+    def buyServers(self, datacenter: Datacenter, server_type: str, quantity: int) -> None:
         # check if server type exists
         if server_type not in self.server_types:
             raise ValueError(f"Server type '{server_type}' does not exist.")
@@ -106,7 +164,7 @@ class DecisionMaker(object):
             
             self.addToSolution(self.timestep, datacenter.name, server_type, server_id, "buy")
 
-    def sellServers(self, datacenter: str, server_type: str, quantity: int) -> None:
+    def sellServers(self, datacenter: Datacenter, server_type: str, quantity: int) -> None:
         # check if server type exists
         if server_type not in self.server_types:
             raise ValueError(f"Server type '{server_type}' does not exist.")
@@ -168,6 +226,41 @@ class DecisionMaker(object):
                 if self.datacenters[d].latency_sensitivity == latency_sensitivity }
     
     
+
+    """
+        returns a nested dictionary mapping datacentres to servers to the lifetime remaining of the oldest server of that type in that datacenter
+        e.g. lifetimes_left["DC1"]["CPU.S1"]== 24
+    """
+    def getLifetimesLeft(self)-> dict[str,dict[str,int]]:
+        
+        lifetimes_left = {}
+
+        for dc, datacenter in self.datacenters.items():
+
+            dc_lifetimes = {}
+
+            for s, server in self.server_types.items():
+                
+                if  len(datacenter.inventory[s]) == 0 :
+                    dc_lifetimes[s]=0
+                    
+
+                else:
+
+                    timestep_bought  = datacenter.inventory[s][0][0]
+                    dc_lifetimes[s] = server.life_expectancy - (self.timestep - timestep_bought)
+
+
+                
+            lifetimes_left[dc] = dc_lifetimes
+        
+        return lifetimes_left
+
+
+
+    def getCanBuys(self):
+
+        pass
     
     def getDemandCoeffs(self, datacenters: List[Datacenter]) -> dict[str,float]:
         energy_cost_sum = 0
@@ -215,6 +308,41 @@ class DecisionMaker(object):
 
         return demand_coefficients
     
+    def get_real_ahead_demand(self, lookahead:int) -> dict[str, dict[str, int]]:
+
+        demands = {}
+
+        for latency_sensitivity in get_known('latency_sensitivity'):
+
+                    ## get all data centers for this latency  
+                    dcs = self.getLatencyDataCenters(latency_sensitivity)
+                    
+                    ## dataframe of rows where t = current time step
+                    if self.timestep > get_known("time_steps") - (lookahead+1):
+                        ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)].copy()
+                    else:
+                        ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep+lookahead)].copy()
+
+
+                    latency_demands = {}
+
+                    ## for all servers
+                    for server in self.server_types.keys():
+                        
+                        server_demand_df = ts_demand.loc[(ts_demand['server_generation']==server) ].copy()
+                        if server_demand_df.empty:
+                            latency_demands[server] = 0
+                        else:
+                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+
+                            
+
+                        
+
+                    demands[latency_sensitivity] = latency_demands
+
+        return demands
+
 
     """
      Processes the demand from the csv
@@ -241,8 +369,31 @@ class DecisionMaker(object):
                         if server_demand_df.empty:
                             latency_demands[server] = 0
                         else:
-                            ## demand for the server generation at this latency 
-                            latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (20/19))
+                            ## demand for the server generation at this latency for all timesteps <= current timestep
+                            server_demand =  self.demand.loc[(self.demand['server_generation'] == server)
+                                                             & (self.demand['time_step'] <= self.timestep)].copy()
+                            ls_demand = server_demand[['time_step', latency_sensitivity]].copy()
+                            endog = ls_demand[latency_sensitivity].to_numpy()
+                            
+                            ## If we have demand for only one timestep, use the actual demand
+                            if len(endog)==1:
+                                latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+                                continue
+                            
+                            ## Apply holt's damped smoothing to the demand
+                            np.seterr(divide='ignore')
+                            fit = Holt(endog, damped_trend=True, initialization_method="estimated").fit(
+                                    smoothing_level=0.2, smoothing_trend=0.12, 
+                                )
+                            d = fit.fittedvalues
+
+                            ## In some cases such as holt's, it will produce negative values, so just set it to 0
+                            ## TODO: Deal with this in a better way. boxcox parameter in Holt can potentially be used
+                            d[d<0] = 0
+                            f = fit.forecast(1)
+                            f[f<0] = 0
+                            latency_demands[server] = int(np.average(f) * (10/9))
+                            np.seterr(divide='warn')
 
                     demands[latency_sensitivity] = latency_demands
 
@@ -316,47 +467,119 @@ class DecisionMaker(object):
 
     def step(self):
         self.timestep += 1
+        print(self.timestep)
 
         if self.timestep >= get_known('time_steps')-35:
             self.canBuy = False
+
+        
         
         self.checkConstraints()
 
 
         ## PROCESS DEMAND FROM CSV
-        current_demand = self.processDemand()
+        current_demand = self.get_real_ahead_demand(0)##self.processDemand()
         demand_coeffs = self.get_all_demand_coefficients()
         #weighted_demand = self.getWeightedDemand(current_demand)
 
-        ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
-        for datacenter in self.datacenters.values():
+        lifetimes_left = self.getLifetimesLeft()
 
-            weighted_demand = { server:
-                                         current_demand[datacenter.latency_sensitivity][server]
-                                         * 
-                                         demand_coeffs[datacenter.latency_sensitivity][datacenter.name]
-                                for server in self.server_types.keys()
-                            }
-            datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
-                                                        demands = weighted_demand
-                                                        )
+        lookahead = 20 if self.seed not in self.lookaheads.keys() else self.lookaheads[self.seed]
         
-        self.moveServers()
+        p = 0.2 if self.seed not in self.p.keys() else self.p[self.seed]
+        buyOnce = False if self.seed not in self.buyOnce.keys() else self.buyOnce[self.seed]
+        m = moveLP(self.datacenters,
+                   self.server_types,
+                   current_demand,
+                   self.timestep,
+                   p,
+                   buyOnce,
+                    predicted_demand=self.get_real_ahead_demand(lookahead),
+                    lifetimes_left=lifetimes_left,
+                    can_buy= self.canBuy,
+                    
+                )
+        m.solve()
+
+        assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
+        
+        # ## GET NUMBER OF ADD AND REMOVE FOR EACH DATACENTRE 
+        # for datacenter in self.datacenters.values():
+
+        #     weighted_demand = { server:
+        #                                  current_demand[datacenter.latency_sensitivity][server]
+        #                                  * 
+        #                                  demand_coeffs[datacenter.latency_sensitivity][datacenter.name]
+        #                         for server in self.server_types.keys()
+        #                     }
+        #     datacenter.find_add_remove_for_all_servers(timestep=self.timestep,
+        #                                                 demands = weighted_demand
+        #                                                 )
+        
+        # self.moveServers()
+
+        adds, removes, moves = 0,0,0 
+
+        for moveVar in m.variables:
+            details = moveVar.split("_")
+            from_dc = details[0]
+            to_dc = details[1]
+            s = details[2]
+
+            moves += m.variables[moveVar].varValue
+
+            for _ in range(int(m.variables[moveVar].varValue)):
+                server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
+                self.addToSolution(self.timestep, to_dc, s, server_id, "move")
+
+        for removeVar in m.removeVariables:
+            details = removeVar.split("_")
+            dc = details[0]
+            s = details[1]
+
+            removes += m.removeVariables[removeVar].varValue
+
+            self.sellServers(self.datacenters[dc], s, int(m.removeVariables[removeVar].varValue))
+        
+        # if self.canBuy:
+        for addVar in m.addVariables:
+            details = addVar.split("_")
+            dc = details[0]
+            s = details[1]
+
+            adds += m.addVariables[addVar].varValue
+
+            # ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)
+            #                             & (self.demand['server_generation']==s)].copy()
+            # s_demand = 0
+            # if not ts_demand.empty:
+            #     s_demand = (ts_demand.iloc[0][self.datacenters[dc].latency_sensitivity] * 
+            #                 demand_coeffs[self.datacenters[dc].latency_sensitivity][self.datacenters[dc].name])
             
-        ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
-        for datacenter in self.datacenters.values():
+            # actual = int((s_demand - 
+            #               (len(self.datacenters[dc].inventory[s]) * self.server_types[s].capacity))
+            #               //self.server_types[s].capacity)
 
-            for server, remove_amount in datacenter.removing_servers.items():
+            # if actual < 0:
+            #     actual = 0
+            #self.buyServers(self.datacenters[dc], s, min(actual, int(m.addVariables[addVar].varValue)))
+            self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
+
+        
+        # ## CARRY OUT TRANSACTIONS LIKE BUY, DISMISS, MOVE
+        # for datacenter in self.datacenters.values():
+
+        #     for server, remove_amount in datacenter.removing_servers.items():
                         
-                    self.sellServers(datacenter,server,remove_amount)
+        #             self.sellServers(datacenter,server,remove_amount)
 
-            if self.canBuy:
-                for server, add_amount in datacenter.adding_servers.items():
+        #     if self.canBuy:
+        #         for server, add_amount in datacenter.adding_servers.items():
                             
-                        self.buyServers(datacenter,server,add_amount)
+        #                 self.buyServers(datacenter,server,add_amount)
 
            
-            
+        print(f"ADDS: {adds}  REMOVES: {removes}  MOVES: {moves}")
 
 
 

@@ -10,10 +10,10 @@ from evaluation import get_actual_demand
 
 from helpers.decision_maker import DecisionMaker
 
-def get_my_solution(d):
+def get_my_solution(d, s):
     _, datacenters, servers, selling_prices = load_problem_data()
     
-    decision_maker = DecisionMaker(datacenters,servers,selling_prices, d)
+    decision_maker = DecisionMaker(datacenters,servers,selling_prices, d, s)
 
     return decision_maker.solve()
     
@@ -23,10 +23,13 @@ def get_my_solution(d):
 
 
 
-seeds = known_seeds('training')
+seeds = known_seeds('test')
+
+
 
 demand = pd.read_csv('./data/demand.csv')
 for seed in seeds:
+    print(f"SEED: #{seed}")
     # SET THE RANDOM SEED
     np.random.seed(seed)
 
@@ -34,7 +37,7 @@ for seed in seeds:
     actual_demand = get_actual_demand(demand)
 
     # CALL YOUR APPROACH HERE
-    solution = get_my_solution(actual_demand)
+    solution = get_my_solution(actual_demand, seed)
 
     # SAVE YOUR SOLUTION
     save_solution(solution, f'./output/{seed}.json')
