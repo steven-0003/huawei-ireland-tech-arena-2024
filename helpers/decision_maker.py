@@ -13,6 +13,8 @@ import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter('ignore', ConvergenceWarning)
 
+
+
 class DecisionMaker(object):
     """
     A class to represent the decision maker.
@@ -522,7 +524,7 @@ class DecisionMaker(object):
 
     def step(self):
         self.timestep += 1
-        print(self.timestep)
+        # print(self.timestep)
 
         if self.timestep >= get_known('time_steps')-35:
             self.canBuy = False
@@ -630,7 +632,8 @@ class DecisionMaker(object):
                             
         #                 self.buyServers(datacenter,server,add_amount)
         
-        print(f"ADDS: {adds}  REMOVES: {removes}  MOVES: {moves}")
+        # print(f"ADDS: {adds}  REMOVES: {removes}  MOVES: {moves}")
+
 
     def solve(self):
 
@@ -712,20 +715,35 @@ class DecisionMaker(object):
         return utilization_sum / total_pairs if total_pairs > 0 else 0  # If there are no pairs, return 0 to avoid division by zero.
 
     #calculate the lifespan at a given timestep
-    @DeprecationWarning
-    def calculateLifespanAtTimestep(self, timestep: int) -> float:
+    def calculateLifespanAtTimestep(self) -> float:
+        """
+            Gets the L Objective at each timestep
+
+            Returns: L Objective at current timestep
+        """
+
+        ## sum of time_deployed/life_expectancy for each server 
         lifespan_sum = 0
+
         total_servers = 0
 
         for datacenter in self.datacenters.values():
             for server_type, server_list in datacenter.inventory.items():
-                for deployed_time in server_list:
+
+                for deployed_time, server_id in server_list:
+                    
+                    
                     server = self.server_types[server_type]
-                    lifespan_sum += deployed_time / server.life_expectancy
+
+                    lifespan_sum += (self.timestep - deployed_time + 1) / server.life_expectancy
+
                     total_servers += 1
 
-        return lifespan_sum / total_servers if total_servers > 0 else 0 # If there are no pairs, return 0 to avoid division by zero.
+        # If there are no pairs, return 0 to avoid division by zero.
+        return lifespan_sum / total_servers if total_servers > 0 else 0 
     
+
+
     #calculate the profit at a given timestep
     @DeprecationWarning
     def calculateProfitAtTimestep(self, servers: List[Server], timestep: int) -> float:
