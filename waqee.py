@@ -178,6 +178,8 @@ class moveLP:
                                         f+s+" Move + Add Less Than Current Stock Constraint"
                             )
                 
+
+
         ## the sum of all the servers moving from f, the servers being removed from f and the servers being held at f
         ## should be equal to the current stock of that server
         for s in self.server_types:
@@ -191,15 +193,10 @@ class moveLP:
                 
      
 
-        
-
-
-        
-
-
+    
         
         
-        ## the number of servers of a particular type moving to a datacentre, shouldnt exceed the demand for that server at that datacenter
+        ## the number of servers of a particular type moving to a datacentre, shouldnt exceed the demand*CONSTANT for that server at that datacenter
         for s in self.server_types:            
             for latency in get_known('latency_sensitivity'):
 
@@ -209,17 +206,11 @@ class moveLP:
                                                     for var in self.moveVariables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
 
-                                            # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
-                                            #         for var in self.variables
-                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[2]==s ] 
-
                                             +   [   self.addVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.addVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
 
-                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
-                                            #         for var in self.removeVariables  
-                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                           
                                             +
                                                 [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.holdVariables
@@ -227,15 +218,12 @@ class moveLP:
                                             ) 
                                     <=
                                     self.demand[latency][s] * 2
-                                    # -
-                                    # sum( [ 
-                                    #                                 dc.getServerStock(s)*self.server_types[s].capacity
-                                    #                                 for dc in self.datacenters.values()
-                                    #                                 if dc.latency_sensitivity==latency 
-                                    #                             ])
+                                 
                                 , s+latency+ " Adds - Removes + Moves to datacenters of this latency shouldnt exceed the demand Constraint"
                                 )
                 
+
+
         ## the total slot size of the servers going in and out of a datacenter should not exceed the slot capacity 
         for t, dc in self.datacenters.items():
                 
@@ -246,24 +234,14 @@ class moveLP:
                                                 for var in self.moveVariables
                                                 if var.split("_")[1]==t
                                         ]
-                                        # +
-                                        # [
-                                        #      (-self.variables[var] * self.server_types[ var.split("_")[2]].slots_size )
-                                        #         for var in self.variables
-                                        #         if var.split("_")[0]==t
-                                        # ]
+                                      
                                         +
                                         [
                                             (self.addVariables[var] * self.server_types[var.split("_")[1]].slots_size)
                                                 for var in self.addVariables
                                                 if var.split("_")[0]==t
                                         ]
-                                        # +
-                                        # [
-                                        #     (-self.removeVariables[var] * self.server_types[var.split("_")[1]].slots_size)
-                                        #         for var in self.removeVariables
-                                        #         if var.split("_")[0]==t
-                                        # ]
+                                      
                                         
                                         
                                         +
@@ -276,10 +254,8 @@ class moveLP:
 
                                     <= 
 
-                                    ## THIS CONSTRAINT IS PROBLEMATIC
-                                    ## SHOULD BE  <= dc.slots_capacity
-                                    ## BUT THAT GIVES AN ERROR FOR SOME REASON??
-                                    dc.slots_capacity ##- dc.inventory_level
+                                    
+                                    dc.slots_capacity 
 
                                     , t + " Slots Taken Do Not Exceed Capacity Constraint"
 
@@ -356,38 +332,27 @@ class moveLP:
         for s in self.server_types:            
             for latency in get_known('latency_sensitivity'):
 
-                # self.model += 
+                
                 constraint= pulp.LpConstraint           (
                                 e=pulp.lpSum(  
                                                 [   self.moveVariables[var] * self.server_types[var.split("_")[2]].capacity 
                                                     for var in self.moveVariables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
 
-                                            # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
-                                            #         for var in self.variables
-                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[2]==s ] 
-
+                                          
                                             +   [   self.addVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.addVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]
 
-                                            # +   [   -self.removeVariables[var] * self.server_types[var.split("_")[1]].capacity
-                                            #         for var in self.removeVariables  
-                                            #         if self.datacenters[var.split("_")[0]].latency_sensitivity==latency and var.split("_")[1]==s ]   
+                                          
                                             +
                                                 [   self.holdVariables[var] * self.server_types[var.split("_")[1]].capacity
                                                     for var in self.holdVariables
                                                     if self.datacenters[var.split("_")[0]].latency_sensitivity == latency and var.split("_")[1]==s]
                                             ) 
-                                    # <=
+                                    
                                     , sense=pulp.LpConstraintLE
-                                    # ,self.demand[latency][s] 
-                                    # -
-                                    # sum( [ 
-                                    #                                 dc.getServerStock(s)*self.server_types[s].capacity
-                                    #                                 for dc in self.datacenters.values()
-                                    #                                 if dc.latency_sensitivity==latency 
-                                    #                             ])
+                                    
                                 , name=s+latency+ " Adds - Removes + Moves to datacenters of this latency shouldnt exceed the demand Constraint"
                                 ,rhs=self.demand[latency][s]
                                 )
@@ -520,7 +485,7 @@ class moveLP:
         lifetime_left = self.lifetimes_left[datacenter.name][server.name]
         lifetime_coeff = lifetime_left/server.life_expectancy
 
-        profit *= lifetime_coeff##lifetime_left ##(server.life_expectancy*0.5)
+        profit *= lifetime_coeff
                   
         return profit
 
