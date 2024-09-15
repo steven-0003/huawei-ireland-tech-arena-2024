@@ -189,37 +189,10 @@ class moveLP:
                                           ) == dc.getServerStock(s),
                                 f+s+" -Move - Remove + Hold Equal To Current Stock Constraint")
                 
-        ## MAY BE A REDUNDANT CONSTRAINT
-        for f, dc in self.datacenters.items():
-
-            self.model += (
-                            pulp.lpSum(
-                                    [self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f]
-                                +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f]
-                                +   [self.holdVariables[var] for var in self.holdVariables if var.split("_")[0]==f]
-                            )
-                            == dc.getStockLevel(),
-                            f+"Number of servers being moved from, removed from and held at this datacenter should be less than total number of servers at this datacenter Constraint"
-            )
-            
-        ## MAY BE A REDUNDANT CONSTRAINT
-        ## the amount of servers of type s being moved from a datacentre, should be less than the current stock of s in the datacenter 
-        for s in self.server_types:
-            for f,dc in self.datacenters.items():
-
-                self.model += (
-                                    pulp.lpSum( [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s] )
-                                    <= dc.getServerStock(s),
-                                    f+s+" Move Less Than Current Stock Constraint")
-        
-        
+     
 
         
 
-
-        
-        
-              
 
         
 
