@@ -46,7 +46,7 @@ class moveLP:
     def createVariables(self):
 
         ## create move decision variables 
-        self.variables = pulp.LpVariable.dicts(     name = "move",
+        self.moveVariables = pulp.LpVariable.dicts(     name = "move",
                                                     indices = [
                                                         (dc_from.name+"_"+dc_to.name+"_"+server.name)
                                                             for dc_from in self.datacenters.values()
@@ -126,12 +126,12 @@ class moveLP:
         ## set bounds for variables
 
         ## move variables bounds
-        for var in self.variables:
+        for var in self.moveVariables:
 
-            self.variables[var].lowBound = 0
+            self.moveVariables[var].lowBound = 0
             var_details = var.split("_")
 
-            self.variables[var].upBound =   self.datacenters[ var_details[0] ].getServerStock( var.split("_")[2] ) 
+            self.moveVariables[var].upBound =   self.datacenters[ var_details[0] ].getServerStock( var.split("_")[2] ) 
 
         ## add variable bounds
         for var in self.addVariables:
@@ -169,7 +169,7 @@ class moveLP:
             for f,dc in self.datacenters.items():
 
                 self.model += (
-                                    pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] 
+                                    pulp.lpSum( [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s] 
                                             +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s]
                                         )
                             
@@ -183,7 +183,7 @@ class moveLP:
         for s in self.server_types:
             for f,dc in self.datacenters.items():
                 
-                self.model += (pulp.lpSum(  [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] 
+                self.model += (pulp.lpSum(  [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s] 
                                           + [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s] 
                                           + [self.holdVariables[var] for var in self.holdVariables if var.split("_")[0]==f and var.split("_")[1] == s]
                                           ) == dc.getServerStock(s),
@@ -194,7 +194,7 @@ class moveLP:
 
             self.model += (
                             pulp.lpSum(
-                                    [self.variables[var] for var in self.variables if var.split("_")[0]==f]
+                                    [self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f]
                                 +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f]
                                 +   [self.holdVariables[var] for var in self.holdVariables if var.split("_")[0]==f]
                             )
@@ -208,7 +208,7 @@ class moveLP:
             for f,dc in self.datacenters.items():
 
                 self.model += (
-                                    pulp.lpSum( [ self.variables[var] for var in self.variables if var.split("_")[0]==f  and var.split("_")[2]==s] )
+                                    pulp.lpSum( [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s] )
                                     <= dc.getServerStock(s),
                                     f+s+" Move Less Than Current Stock Constraint")
         
@@ -232,8 +232,8 @@ class moveLP:
 
                 self.model +=         (         
                                             pulp.lpSum(  
-                                                [   self.variables[var] * self.server_types[var.split("_")[2]].capacity 
-                                                    for var in self.variables
+                                                [   self.moveVariables[var] * self.server_types[var.split("_")[2]].capacity 
+                                                    for var in self.moveVariables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
 
                                             # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
@@ -269,8 +269,8 @@ class moveLP:
                 self.model += (
                                     pulp.lpSum(
                                          [  
-                                              (self.variables[var] * self.server_types[var.split("_")[2]].slots_size )
-                                                for var in self.variables
+                                              (self.moveVariables[var] * self.server_types[var.split("_")[2]].slots_size )
+                                                for var in self.moveVariables
                                                 if var.split("_")[1]==t
                                         ]
                                         # +
@@ -361,16 +361,16 @@ class moveLP:
     def setMoveIncreaseBounds(self):
 
         ## makes sure that move variables to and from are set to 0 according to whether or not that datacenter is increasing for a particular server
-        for var in self.variables:
+        for var in self.moveVariables:
 
             var_details = var.split("_")
-            self.model += self.variables[var] <=   self.datacenters[ var_details[0] ].getServerStock( var.split("_")[2] ) * (self.decreaseVariables[var_details[0]+"_"+var_details[2]])
+            self.model += self.moveVariables[var] <=   self.datacenters[ var_details[0] ].getServerStock( var.split("_")[2] ) * (self.decreaseVariables[var_details[0]+"_"+var_details[2]])
 
-        for var in self.variables:
+        for var in self.moveVariables:
             
             var_details = var.split("_")
             latency = self.datacenters[var_details[1]].latency_sensitivity
-            self.model += self.variables[var] <= self.demand[latency][var_details[2]] * self.increaseVariables[var_details[1]+"_"+var_details[2]]
+            self.model += self.moveVariables[var] <= self.demand[latency][var_details[2]] * self.increaseVariables[var_details[1]+"_"+var_details[2]]
 
 
 
@@ -386,8 +386,8 @@ class moveLP:
                 # self.model += 
                 constraint= pulp.LpConstraint           (
                                 e=pulp.lpSum(  
-                                                [   self.variables[var] * self.server_types[var.split("_")[2]].capacity 
-                                                    for var in self.variables
+                                                [   self.moveVariables[var] * self.server_types[var.split("_")[2]].capacity 
+                                                    for var in self.moveVariables
                                                     if self.datacenters[var.split("_")[1]].latency_sensitivity==latency and var.split("_")[2]==s ]
 
                                             # +   [   -self.variables[var] * self.server_types[var.split("_")[2]].capacity 
@@ -455,7 +455,7 @@ class moveLP:
             ]
             +
             [
-                self.getMoveObjectiveCoeff(var) * self.variables[var] for var in self.variables
+                self.getMoveObjectiveCoeff(var) * self.moveVariables[var] for var in self.moveVariables
             ]
             +
             [

@@ -572,15 +572,15 @@ class DecisionMaker(object):
 
         adds, removes, moves = 0,0,0 
 
-        for moveVar in m.variables:
+        for moveVar in m.moveVariables:
             details = moveVar.split("_")
             from_dc = details[0]
             to_dc = details[1]
             s = details[2]
 
-            moves += m.variables[moveVar].varValue
+            moves += m.moveVariables[moveVar].varValue
 
-            for _ in range(int(m.variables[moveVar].varValue)):
+            for _ in range(int(m.moveVariables[moveVar].varValue)):
                 server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
                 self.addToSolution(self.timestep, to_dc, s, server_id, "move")
 
