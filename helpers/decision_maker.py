@@ -407,6 +407,23 @@ class DecisionMaker(object):
 
         return demands
 
+    def get_actual_demand(self) -> dict[str, dict[str, float]]:
+        demands = {}
+
+        for latency_sensitivity in get_known('latency_sensitivity'):
+            latency_demands = {}
+            ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)].copy()
+
+            for server in self.server_types.keys():
+                server_demand_df = ts_demand.loc[(ts_demand['server_generation']==server) ].copy()
+                if server_demand_df.empty:
+                    latency_demands[server] = 0
+                else:
+                    latency_demands[server] = server_demand_df.iloc[0][latency_sensitivity]
+            demands[latency_sensitivity] = latency_demands
+
+        return demands
+
     """
      Processes the demand from the csv
     """
@@ -609,10 +626,10 @@ class DecisionMaker(object):
 
         
      
-        ## CALCULATE OBJECTIVE
-        self.OBJECTIVE += self.calculateObjective(current_demand,move_ids)
-
         if self.verbose:
+            ## CALCULATE OBJECTIVE
+            self.OBJECTIVE += self.calculateObjective(self.get_actual_demand(),move_ids)
+
             print(f"{self.timestep}  OBJ: { self.OBJECTIVE}" )
 
 
