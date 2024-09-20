@@ -4,7 +4,7 @@ from evaluation import evaluation_function
 from seeds import known_seeds
 import statistics
 
-seeds = known_seeds('test')
+seeds = known_seeds()
 
 scores = []
 
@@ -17,17 +17,19 @@ for seed in seeds:
     
 
     # LOAD SOLUTION
-    solution = load_solution(f'./output/{seed}.json')
+    fleet, pricing_strategy = load_solution(f'./output/{seed}.json')
 
     # LOAD PROBLEM DATA
-    demand, datacenters, servers, selling_prices = load_problem_data()
+    demand, datacenters, servers, selling_prices, elasticity = load_problem_data()
 
     # EVALUATE THE SOLUTION
-    score = evaluation_function(solution,
+    score = evaluation_function(fleet,
+                                pricing_strategy,
                                 demand,
                                 datacenters,
                                 servers,
                                 selling_prices,
+                                elasticity,
                                 seed=seed,
                                 verbose=1)
     scores.append(score)

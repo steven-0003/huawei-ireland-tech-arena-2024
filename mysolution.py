@@ -11,11 +11,13 @@ from evaluation import get_actual_demand
 from helpers.decision_maker import DecisionMaker
 
 def get_my_solution(d, s):
-    _, datacenters, servers, selling_prices = load_problem_data()
+    _, datacenters, servers, selling_prices, _ = load_problem_data()
     
     decision_maker = DecisionMaker(datacenters,servers,selling_prices, d, s)
 
-    return decision_maker.solve()
+    fleet, prices = decision_maker.solve()
+
+    return pd.DataFrame(fleet), pd.DataFrame(prices)
     
 
 
@@ -32,7 +34,7 @@ for seed in seeds:
     actual_demand = get_actual_demand(demand)
 
     # CALL YOUR APPROACH HERE
-    fleet, pricing_strategy = get_my_solution(actual_demand)
+    fleet, pricing_strategy = get_my_solution(actual_demand, seed)
 
     # SAVE YOUR SOLUTION
     save_solution(fleet, pricing_strategy, f'./output/{seed}.json')

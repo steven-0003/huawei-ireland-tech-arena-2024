@@ -105,6 +105,7 @@ class DecisionMaker(object):
         self.canBuy = True     
 
         self.solution = []
+        self.sellingPrices = []
 
         self.OBJECTIVE = 0 
         self.verbose = verbose
@@ -273,8 +274,17 @@ class DecisionMaker(object):
                         "server_id": server_id,
                         "action": action
                         }
+
+        price = {
+            "time_step": timestep,
+            "latency_sensitivity": self.datacenters[datacenter].latency_sensitivity,
+            "server_generation": server_type,
+            "price": self.server_types[server_type].selling_prices[self.datacenters[datacenter].latency_sensitivity]
+        }
         
         self.solution.append(transaction)
+        self.sellingPrices.append(price)
+        
         return True   
 
     def getLatencyDataCenters(self, latency_sensitivity: str) -> dict[str,Datacenter]:
@@ -639,7 +649,7 @@ class DecisionMaker(object):
         for t in range(1, get_known('time_steps')+1):
             self.step()
         
-        return self.solution
+        return self.solution, self.sellingPrices
     
 
     
