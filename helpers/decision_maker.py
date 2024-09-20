@@ -2,6 +2,7 @@ from typing import List
 import pandas as pd
 import numpy as np
 import ast
+import math
 import numpy as np
 from evaluation import get_known, adjust_capacity_by_failure_rate, get_maintenance_cost
 from helpers.datacenters import Datacenter
@@ -9,7 +10,7 @@ from helpers.server_type import Server
 
 from waqee import moveLP
 
-from statsmodels.tsa.api import Holt
+from statsmodels.tsa.api import Holt, ARIMA
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter('ignore', ConvergenceWarning)
@@ -375,6 +376,59 @@ class DecisionMaker(object):
 
         return demand_coefficients
     
+    def predicted_demand(self, lookahead:int) -> dict[str, dict[str, int]]:
+        demands = {}
+
+        for latency_sensitivity in get_known('latency_sensitivity'):
+
+                    ## get all data centers for this latency  
+                    dcs = self.getLatencyDataCenters(latency_sensitivity)
+                    
+                    ## dataframe of rows where t = current time step
+                    ts_demand = self.demand.loc[(self.demand['time_step']==self.timestep)].copy()
+
+                    latency_demands = {}
+
+                    ## for all servers
+                    for server in self.server_types.keys():
+                        
+                        server_demand_df = ts_demand.loc[(ts_demand['server_generation']==server) ].copy()
+                        if server_demand_df.empty:
+                            latency_demands[server] = 0
+                        else:
+                            ## demand for the server generation at this latency for all timesteps <= current timestep
+                            server_demand =  self.demand.loc[(self.demand['server_generation'] == server)
+                                                             & (self.demand['time_step'] <= self.timestep)].copy()
+                            ls_demand = server_demand[['time_step', latency_sensitivity]].copy()
+                            endog = ls_demand[latency_sensitivity].to_numpy()
+                            
+                            ## If we have demand for only one timestep, use the actual demand
+                            if len(endog)<=8:
+                                latency_demands[server] = int(server_demand_df.iloc[0][latency_sensitivity] * (10/9))
+                                continue
+                            
+                            ## Apply holt's damped smoothing to the demand
+                            np.seterr(divide='ignore')
+                            # fit = Holt(endog, damped_trend=True, initialization_method="heuristic").fit(
+                            #         optimized = True
+                            #     )
+                            fit = ARIMA(endog, order=(2,1,2), enforce_invertibility=False, enforce_stationarity=False).fit()
+                            #d = fit.fittedvalues
+
+                            ## In some cases such as holt's, it will produce negative values, so just set it to 0
+                            ## TODO: Deal with this in a better way. boxcox parameter in Holt can potentially be used
+                            #d[d<0] = 0
+                            f = fit.get_forecast(lookahead)
+                            pred = f.summary_frame(alpha=0.1).iloc[-1]['mean_ci_lower']
+                            if pred < 0 or math.isnan(pred):
+                                pred = 0
+                            latency_demands[server] = int(pred * (10/9))
+                            np.seterr(divide='warn')
+
+                    demands[latency_sensitivity] = latency_demands
+
+        return demands
+    
     def get_real_ahead_demand(self, lookahead:int) -> dict[str, dict[str, int]]:
         """Gets the actual future demand
 
@@ -579,7 +633,7 @@ class DecisionMaker(object):
                    self.timestep,
                    p,
                    buyOnce,
-                    predicted_demand=self.get_real_ahead_demand(lookahead),
+                    predicted_demand=self.predicted_demand(lookahead),
                     lifetimes_left=lifetimes_left,
                     can_buy= self.canBuy,                  
                 )
