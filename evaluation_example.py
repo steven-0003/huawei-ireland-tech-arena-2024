@@ -6,19 +6,22 @@ from evaluation import evaluation_function
 
 
 # LOAD SOLUTION
-solution = load_solution('./output/3329.json')
+fleet, pricing_strategy = load_solution('./data/solution_example.json')
 
 # LOAD PROBLEM DATA
-demand, datacenters, servers, selling_prices = load_problem_data()
+demand, datacenters, servers, selling_prices, elasticity = load_problem_data()
 
 # EVALUATE THE SOLUTION
-score = evaluation_function(solution,
+score = evaluation_function(fleet, 
+                            pricing_strategy,
                             demand,
                             datacenters,
                             servers,
                             selling_prices,
-                            seed=3329,
-                            verbose=1
-                            )
+                            elasticity,
+                            seed=123)
 
 print(f'Solution score: {score}')
+
+
+

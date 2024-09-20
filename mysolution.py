@@ -17,19 +17,14 @@ def get_my_solution(d, s):
 
     return decision_maker.solve()
     
-  
 
 
 
 
-
-seeds = known_seeds('test')
-
-
+seeds = known_seeds()
 
 demand = pd.read_csv('./data/demand.csv')
 for seed in seeds:
-    print(f"SEED: #{seed}")
     # SET THE RANDOM SEED
     np.random.seed(seed)
 
@@ -37,8 +32,8 @@ for seed in seeds:
     actual_demand = get_actual_demand(demand)
 
     # CALL YOUR APPROACH HERE
-    solution = get_my_solution(actual_demand, seed)
+    fleet, pricing_strategy = get_my_solution(actual_demand)
 
     # SAVE YOUR SOLUTION
-    save_solution(solution, f'./output/{seed}.json')
+    save_solution(fleet, pricing_strategy, f'./output/{seed}.json')
 
