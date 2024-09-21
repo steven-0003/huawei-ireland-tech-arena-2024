@@ -6,6 +6,7 @@ from evaluation import get_known, adjust_capacity_by_failure_rate, get_maintenan
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
+from stock_lp import stockLP
 from waqee import moveLP
 
 from statsmodels.tsa.api import Holt
@@ -196,7 +197,7 @@ class DecisionMaker(object):
             raise ValueError(f"Datacenter '{datacenter.name}' does not exist.")
         
         assert(datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)
-               <= datacenter.slots_capacity)
+               <= datacenter.slots_capacity), f"dc {datacenter.name }datacenter inventory level: {datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)}  slot cap {datacenter.slots_capacity} "
 
         for _ in range(quantity):
             server_id = self.generateUniqueId()
@@ -559,6 +560,8 @@ class DecisionMaker(object):
         self.timestep += 1
         
 
+        print(self.datacenters["DC1"].inventory_level)
+
         if self.timestep >= get_known('time_steps')-35:
             self.canBuy = False
    
@@ -566,6 +569,8 @@ class DecisionMaker(object):
 
         ## PROCESS DEMAND FROM CSV
         current_demand = self.get_real_ahead_demand(0)
+
+        demands = {t: self.get_real_ahead_demand(10) for t in range(10) }
         
 
         lifetimes_left = self.getLifetimesLeft()
@@ -577,9 +582,10 @@ class DecisionMaker(object):
 
 
         ## CREATE LINEAR PROGRAMMING PROBLEM
-        m = moveLP(self.datacenters,
+        m = stockLP(self.datacenters,
                    self.server_types,
-                   current_demand,
+                #    current_demand,
+                    demands,
                    self.timestep,
                    p,
                    buyOnce,
@@ -588,27 +594,103 @@ class DecisionMaker(object):
                     can_buy= self.canBuy,                  
                 )
         
+
+      
+        
+        
         ## SOLVE LINEAR PROGRAMMING PROBLEM
         m.solve()
 
+
+        for dc_to, dc in self.datacenters.items():
+            for t in range(10):
+
+                # print("SLOT CONS ADDED")
+                for var in m.addVariables:
+                    # print(f"VAR NAME {var}")
+                    # print(f"dc {var.split('_')[0]}")
+                    # print(f"t {var.split('_')[2]}")
+                    if var.split("_")[0]==dc_to and var.split("_")[2]==str(t):
+                        # print()
+                        print(f"add var value {m.addVariables[var].varValue}")
+                
+                print ("SUM " + str(
+                                    sum(
+                                         [  
+                                              (m.moveVariables[var].varValue * self.server_types[var.split("_")[2]].slots_size )
+                                                for var in m.moveVariables
+                                                if var.split("_")[1]==dc_to and var.split("_")[3]==str(t)
+                                        ]
+                                      
+                                        +
+                                        [
+                                            (m.addVariables[var].varValue * m.server_types[var.split("_")[1]].slots_size)
+                                                for var in m.addVariables
+                                                if var.split("_")[0]==dc_to and var.split("_")[2]==str(t)
+                                        ]
+                                      
+                                        
+                                        
+                                        +
+                                        [
+                                           (m.holdVariables[var].varValue * self.server_types[var.split("_")[1]].slots_size )
+                                                for var in m.holdVariables
+                                                if var.split("_")[0] == dc_to and var.split("_")[2]==str(t)
+                                        ]
+                                    )
+                ))
+
+
+
         assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
         
-      
+
+        for var in m.moveVariables:
+            if var.split("_")[1]=="DC1" and var.split("_")[3]=="0"  :
+                print(f"move: {var} : { m.moveVariables[var].varValue}")
+
+        for var in m.addVariables:
+            if var.split("_")[0]=="DC1"  and var.split("_")[2]=="0":
+                print(f"add: {var} : { m.addVariables[var].varValue}")
+
+        for var in m.holdVariables:
+            if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+                print(f"hold: {var} : {m.holdVariables[var].varValue}")
+
+
+        for var in m.removeVariables:
+                    if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+                        print(f"remove: {var} : {m.removeVariables[var].varValue}")
+
+        for var in m.increaseVariables:
+                    if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+                        print(f"increase: {var} : {m.increaseVariables[var].varValue}")
+
+
+
+                
+
+
         
         ## MOVE SERVERS
         move_ids = set()
         for moveVar in m.moveVariables:
             
-            details = moveVar.split("_")
-            from_dc = details[0]
-            to_dc = details[1]
-            s = details[2]
 
-            
-            for _ in range(int(m.moveVariables[moveVar].varValue)):
-                server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
-                move_ids.add(server_id)
-                self.addToSolution(self.timestep, to_dc, s, server_id, "move")
+            details = moveVar.split("_")
+
+            t = int(details[3])
+
+            if t == 0:
+                from_dc = details[0]
+                to_dc = details[1]
+                s = details[2]
+
+                
+                for _ in range(int(m.moveVariables[moveVar].varValue)):
+                    server_id = self.datacenters[to_dc].move_server(self.datacenters[from_dc], s)
+                    move_ids.add(server_id)
+                    self.addToSolution(self.timestep, to_dc, s, server_id, "move")
 
 
 
@@ -616,10 +698,14 @@ class DecisionMaker(object):
         for removeVar in m.removeVariables:
             
             details = removeVar.split("_")
-            dc = details[0]
-            s = details[1]
 
-            self.sellServers(self.datacenters[dc], s, int(m.removeVariables[removeVar].varValue))
+            t = int(details[2])
+
+            if t == 0:
+                dc = details[0]
+                s = details[1]
+
+                self.sellServers(self.datacenters[dc], s, int(m.removeVariables[removeVar].varValue))
         
 
 
@@ -628,11 +714,15 @@ class DecisionMaker(object):
         for addVar in m.addVariables:
             
             details = addVar.split("_")
-            dc = details[0]
-            s = details[1]
 
-            
-            self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
+            t = int(details[2])
+
+            if t == 0:
+                dc = details[0]
+                s = details[1]
+
+                
+                self.buyServers(self.datacenters[dc], s, int(m.addVariables[addVar].varValue))
 
         
      
