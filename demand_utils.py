@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import torch
 from evaluation import get_actual_demand, get_known
 from utils import load_problem_data
@@ -6,8 +7,11 @@ from copy import deepcopy as dc
 
 from lstm_model import LSTM
 
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-demand, _ , _ , _= load_problem_data() ##pd.read_csv('./data/demand.csv')
+
+
+demand, _ , _ , _, _= load_problem_data() ##pd.read_csv('./data/demand.csv')
 
 
 def getSeedDemand(seed, latency_sensitivity, server_type, lookback ):
@@ -55,26 +59,24 @@ def getSeedDemand(seed, latency_sensitivity, server_type, lookback ):
 
 
 ## get dataframe with past and future values for demand
-def prepare_dataframe_for_lstm(df,latency_sensitivity, back_steps, forward_steps):
+def get_past_demand(df,latency_sensitivity, back_steps):
     df = dc(df)
 
 
-    for i in range(1, forward_steps):
+    # for i in range(1, forward_steps):
 
 
-        df[f'{latency_sensitivity}(t+{i})'] = df[latency_sensitivity].shift(-i)
+    #     df[f'{latency_sensitivity}(t+{i})'] = df[latency_sensitivity].shift(-i)
 
 
     ## load model 
 
 
-    for i in range(1, back_steps+1):
+    for i in range(1, back_steps):
         df[f'{latency_sensitivity}(t-{i})'] = df[latency_sensitivity].shift(i)
 
     
     
-
-    ## flip 
 
     df.dropna(inplace=True)
 
@@ -104,4 +106,87 @@ def get_prediction_from_model(past_demand, server_generation,latency_sensitivity
 
 
 
-data = getSeedDemand(0)
+
+def getPastDataTensor(seed,  latency_sensitivity,server_type, lookback):
+
+    data = getSeedDemand(seed, latency_sensitivity, server_type, lookback)
+
+    shifted_df = get_past_demand(data, latency_sensitivity, lookback)
+
+    shifted_df_as_np = shifted_df.to_numpy()
+
+    
+
+    scaler = MinMaxScaler(feature_range=(-1,1))
+
+    # scaler = StandardScaler()
+
+
+    shifted_df_as_np = scaler.fit_transform(shifted_df_as_np)
+
+    X = shifted_df_as_np##[:, lookahead:]
+
+    # Y = shifted_df_as_np[:,:lookahead]
+
+    ## flip matrix, so values further in the past, come first in the matrix
+    X = dc(np.flip(X,axis=1))
+
+
+    ## flip matrix, so values further in the past, come first in the matrix
+    # X = dc(np.flip(X,axis=1))
+
+    print(X.shape)
+
+    X = X.reshape( (-1, lookback, 1) )
+
+    # Y = Y.reshape( (-1, lookahead, 1) )
+
+    X = torch.tensor(X).float()
+    # Y = torch.tensor(Y).float()
+
+    return X
+
+
+def getPredictions(past_values, server_type, latency_sensitivity):
+    lookahead = 10
+
+    model = LSTM(1, 40, 10, lookahead)
+    model.load_state_dict(torch.load(f"lstm_models/{latency_sensitivity}_{server_type}", weights_only=True))
+    model.eval()# set to evaluation mode
+
+
+    df = pd.DataFrame()
+    
+
+    for past_data in past_values:
+        print(f" past data shape   {past_data.shape}")
+
+        input = torch.unsqueeze(past_data,-1)
+        output = model(input)
+
+        np_array = output.numpy()
+
+
+
+
+        print(output)
+
+
+
+        #print(past_data)
+
+
+
+
+
+past_data = getPastDataTensor(0,"low","CPU.S1",25)
+
+getPredictions(past_data,"low","CPU.S1")
+
+
+
+    
+
+
+
+# data = getSeedDemand(0)
