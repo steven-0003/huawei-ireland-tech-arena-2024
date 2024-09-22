@@ -76,7 +76,7 @@ class stockLP:
                                                             if dc_from != dc_to and dc_from.latency_sensitivity!=dc_to.latency_sensitivity
                                                         ],
                                                     lowBound =0,
-                                                    cat = "Integer"
+                                                    # cat = "Integer"
                                             )
 
         ## varaibles for how much of each server we will add to each datacenter
@@ -92,7 +92,7 @@ class stockLP:
                 
             ],
             lowBound =0,
-            cat="Integer"
+            # cat="Integer"
         )
 
         ## varaibles for how much of each server we will remove from each datacenter
@@ -106,7 +106,7 @@ class stockLP:
 
             ],
             lowBound =0,
-            cat="Integer"
+            # cat="Integer"
         )
 
         ## variables for how much of each server we will hold at each datacenter
@@ -120,7 +120,7 @@ class stockLP:
 
             ],
             lowBound =0,
-            cat="Integer"
+            # cat="Integer"
         )
 
         ## variables to indicate whether we are increasing the number of servers of a particular type at a datacenter
@@ -160,10 +160,10 @@ class stockLP:
                 (dc.name + "_"+ server.name+"_"+str(t)) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                for t in range(-1,self.future_timesteps-1,1)
+                for t in range(-1,self.future_timesteps,1)
             ],
             lowBound =0,
-            cat = "Integer"
+            # cat = "Integer"
         )
 
 
@@ -240,20 +240,20 @@ class stockLP:
         
 
         
-        ## the sum of all the servers moving from f should be less than the number of servers at f  
-        for s in self.server_types:
-            for f,dc in self.datacenters.items():
-                for t in range(self.future_timesteps):
+        # ## the sum of all the servers moving from f should be less than the number of servers at f  
+        # for s in self.server_types:
+        #     for f,dc in self.datacenters.items():
+        #         for t in range(self.future_timesteps):
 
-                    self.model += (
-                                        pulp.lpSum( [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s and var.split("_")[3]==str(t)] 
-                                                +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s and var.split("_")[2]==str(t)]
-                                            )
+        #             self.model += (
+        #                                 pulp.lpSum( [ self.moveVariables[var] for var in self.moveVariables if var.split("_")[0]==f  and var.split("_")[2]==s and var.split("_")[3]==str(t)] 
+        #                                         +   [self.removeVariables[var] for var in self.removeVariables if var.split("_")[0]==f and var.split("_")[1]==s and var.split("_")[2]==str(t)]
+        #                                     )
                                 
-                                                <= self.stockVariables[f"{f}_{s}_{t-1}"],
+        #                                         <= self.stockVariables[f"{f}_{s}_{t-1}"],
                                             
-                                            f+s+str(t)+" Move + Add Less Than Current Stock Constraint"
-                                )
+        #                                     f+s+str(t)+" Move + Add Less Than Current Stock Constraint"
+        #                         )
                 
 
 
@@ -382,7 +382,7 @@ class stockLP:
                                 )
                     
 
-        for t in range(1, self.future_timesteps-1):
+        for t in range(0, self.future_timesteps):
             
             for dc in self.datacenters:
                 for server in self.server_types:
@@ -391,25 +391,25 @@ class stockLP:
 
                                         self.stockVariables[f"{dc}_{server}_{t}"]
                                             ==
-                                        self.holdVariables[f"{dc}_{server}_{t-1}"]
+                                        self.holdVariables[f"{dc}_{server}_{t}"]
                                         +
-                                        self.addVariables[f"{dc}_{server}_{t-1}"]
+                                        self.addVariables[f"{dc}_{server}_{t}"]
                                         +
-                                        pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t-1}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
+                                        pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
 
                                     ) 
                     
-                    cons = (
+                    # cons = (
 
-                                        self.stockVariables[f"{dc}_{server}_{t}"]
-                                            ==
-                                        self.holdVariables[f"{dc}_{server}_{t-1}"]
-                                        +
-                                        self.addVariables[f"{dc}_{server}_{t-1}"]
-                                        +
-                                        pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t-1}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
+                    #                     self.stockVariables[f"{dc}_{server}_{t}"]
+                    #                         ==
+                    #                     self.holdVariables[f"{dc}_{server}_{t-1}"]
+                    #                     +
+                    #                     self.addVariables[f"{dc}_{server}_{t-1}"]
+                    #                     +
+                    #                     pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t-1}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
 
-                                    ) 
+                    #                 ) 
                     
                     # print(cons)
             

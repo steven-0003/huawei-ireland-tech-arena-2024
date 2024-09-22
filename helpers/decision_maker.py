@@ -612,7 +612,7 @@ class DecisionMaker(object):
                     # print(f"t {var.split('_')[2]}")
                     if var.split("_")[0]==dc_to and var.split("_")[2]==str(t):
                         # print()
-                        print(f"add var value {m.addVariables[var].varValue}")
+                        print(f"add var value {var} {m.addVariables[var].varValue}")
                 
                 print ("SUM " + str(
                                     sum(
@@ -642,31 +642,36 @@ class DecisionMaker(object):
 
 
 
-        assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
         
 
         for var in m.moveVariables:
-            if var.split("_")[1]=="DC1" and var.split("_")[3]=="0"  :
+            if var.split("_")[1]=="DC4" and var.split("_")[3]=="0"  :
                 print(f"move: {var} : { m.moveVariables[var].varValue}")
 
         for var in m.addVariables:
-            if var.split("_")[0]=="DC1"  and var.split("_")[2]=="0":
+            if var.split("_")[0]=="DC4"  and var.split("_")[2]=="0":
                 print(f"add: {var} : { m.addVariables[var].varValue}")
 
         for var in m.holdVariables:
-            if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+            if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
                 print(f"hold: {var} : {m.holdVariables[var].varValue}")
 
 
         for var in m.removeVariables:
-                    if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+                    if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
                         print(f"remove: {var} : {m.removeVariables[var].varValue}")
 
         for var in m.increaseVariables:
-                    if var.split("_")[0]=="DC1"  and  var.split("_")[2]=="0":
+                    if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
                         print(f"increase: {var} : {m.increaseVariables[var].varValue}")
 
+        for var in m.stockVariables:
+                    if var.split("_")[0]=="DC4":##  and  var.split("_")[2]=="0":
+                        print(f"stock: {var} : {m.stockVariables[var].varValue}")
 
+
+
+        assert m.model.status == 1, f"LINEAR PROGRAMMING PROBLEM HAS NOT FOUND A FEASIBLE SOLUTION: STATUS CODE = {m.model.status}"
 
                 
 
@@ -735,6 +740,9 @@ class DecisionMaker(object):
 
 
     def solve(self):
+
+
+        self.buyServers(self.datacenters["DC4"], "CPU.S1", 100)
 
         for t in range(1, get_known('time_steps')+1):
             self.step()
