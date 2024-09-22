@@ -32,7 +32,7 @@ class stockLP:
      
         
         self.timestep = timestep
-        self.future_timesteps = 1
+        self.future_timesteps = 5
 
         ## create model 
         self.model = pulp.LpProblem("moves", pulp.LpMaximize)
@@ -71,11 +71,11 @@ class stockLP:
                                                             for dc_from in self.datacenters.values()
                                                                 for dc_to in self.datacenters.values()
                                                                     for server in self.server_types.values()
-                                                                        for t in range(0,0)#self.future_timesteps,1)
+                                                                        for t in range(0,self.future_timesteps,1)
 
                                                             if dc_from != dc_to and dc_from.latency_sensitivity!=dc_to.latency_sensitivity
                                                         ],
-                                                    
+                                                    lowBound =0,
                                                     cat = "Integer"
                                             )
 
@@ -89,9 +89,9 @@ class stockLP:
                 for t in range(0,self.future_timesteps,1)
 
                 # if  server.canBeDeployed(self.timestep) and  server.isProfitable(self.timestep, dc.latency_sensitivity) ##and (self.timestep%2==1 or self.buyOnce)##self.can_buy
-
+                
             ],
-
+            lowBound =0,
             cat="Integer"
         )
 
@@ -102,10 +102,10 @@ class stockLP:
                 (dc.name+"_"+server.name+"_"+str(t)) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                for t in range(0,0)#self.future_timesteps,1)
+                for t in range(0,self.future_timesteps,1)
 
             ],
-
+            lowBound =0,
             cat="Integer"
         )
 
@@ -119,6 +119,7 @@ class stockLP:
                 for t in range(0,self.future_timesteps,1)
 
             ],
+            lowBound =0,
             cat="Integer"
         )
 
@@ -159,8 +160,9 @@ class stockLP:
                 (dc.name + "_"+ server.name+"_"+str(t)) 
                 for dc in self.datacenters.values()
                 for server in self.server_types.values()
-                for t in range(-1,self.future_timesteps,1)
+                for t in range(-1,self.future_timesteps-1,1)
             ],
+            lowBound =0,
             cat = "Integer"
         )
 
@@ -180,7 +182,7 @@ class stockLP:
             to_dc = var_details[1]
             server=var_details[2]
             t = int(var_details[3])
-
+           
             self.moveVariables[var].upBound =   self.stockVariables[f"{from_dc}_{server}_{t-1}"]##self.datacenters[ var_details[0] ].getServerStock( var.split("_")[2] ) 
 
         ## add variable bounds
@@ -195,6 +197,8 @@ class stockLP:
 
             self.addVariables[var].upBound= int(self.datacenters[dc].slots_capacity
                                                 /self.server_types[server].capacity)
+            
+            
 
         ## remove variable bounds
         for var in self.removeVariables:    
@@ -303,7 +307,7 @@ class stockLP:
         for dc_to, dc in self.datacenters.items():
             for t in range(self.future_timesteps):
 
-                print("SLOT CONS ADDED")
+                
                 
                 self.model += (
                                     pulp.lpSum(
@@ -359,13 +363,13 @@ class stockLP:
 
      
                     
-        
+       
 
-        for t in range(1, self.future_timesteps):
+        for t in range(0, self.future_timesteps):
             
             for dc in self.datacenters:
                 for server in self.server_types:
-
+                    
                     self.model += (
                                     self.stockVariables[f"{dc}_{server}_{t-1}"]
                                       ==
@@ -373,9 +377,41 @@ class stockLP:
                                     +
                                     self.removeVariables[f"{dc}_{server}_{t}"]
                                     +
-                                    pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
+                                    pulp.lpSum([self.moveVariables[f"{dc}_{dc_to}_{server}_{t}"] for dc_to in self.datacenters if dc_to!=dc and  self.datacenters[dc_to].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
                                     
                                 )
+                    
+
+        for t in range(1, self.future_timesteps-1):
+            
+            for dc in self.datacenters:
+                for server in self.server_types:
+                    
+                    self.model += (
+
+                                        self.stockVariables[f"{dc}_{server}_{t}"]
+                                            ==
+                                        self.holdVariables[f"{dc}_{server}_{t-1}"]
+                                        +
+                                        self.addVariables[f"{dc}_{server}_{t-1}"]
+                                        +
+                                        pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t-1}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
+
+                                    ) 
+                    
+                    cons = (
+
+                                        self.stockVariables[f"{dc}_{server}_{t}"]
+                                            ==
+                                        self.holdVariables[f"{dc}_{server}_{t-1}"]
+                                        +
+                                        self.addVariables[f"{dc}_{server}_{t-1}"]
+                                        +
+                                        pulp.lpSum([self.moveVariables[f"{dc_from}_{dc}_{server}_{t-1}"] for dc_from in self.datacenters if dc_from!=dc and  self.datacenters[dc_from].latency_sensitivity!=self.datacenters[dc].latency_sensitivity])
+
+                                    ) 
+                    
+                    # print(cons)
             
             
 
