@@ -74,16 +74,16 @@ class DecisionMaker(object):
                     4363: False,
                     5693: False}
 
-        self.k = {2521: 16,
-                    2381: 15,
-                    5351: 17,
-                    6047: 15,
-                    6829: 15,
-                    9221: 15,
-                    9859: 15,
-                    8053: 15,
-                    1097: 15,
-                    8677: 15}
+        self.k = {2521: 13,
+                    2381: 4,
+                    5351: 10,
+                    6047: 3,
+                    6829: 3,
+                    9221: 5,
+                    9859: 3,
+                    8053: 5,
+                    1097: 3,
+                    8677: 3}
         
         self.setServerTypes(server_types, selling_prices)        
         self.setDataCenters(datacenters)
@@ -159,7 +159,7 @@ class DecisionMaker(object):
                                                             s.life_expectancy,
                                                             s.cost_of_moving,
                                                             s.average_maintenance_fee,
-                                                            k                 
+                                                            k            
                                                         ) for s in server_types.itertuples() }
 
         ## add the selling prices to the server type
