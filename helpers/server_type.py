@@ -45,7 +45,7 @@ class Server(object):
         self.life_expectancy = life_expectancy
         self.cost_of_moving = cost_of_moving
         self.avg_maintenance_fee = avg_maintenance_fee
-        self.k = k
+        self.k = 10##k
 
     def setSellingPrices(self, new_prices: Dict) -> None:
         self.selling_prices = new_prices

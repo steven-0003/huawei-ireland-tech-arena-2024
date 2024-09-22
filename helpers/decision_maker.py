@@ -567,7 +567,7 @@ class DecisionMaker(object):
 
         print(self.datacenters["DC1"].inventory_level)
 
-        if self.timestep >= get_known('time_steps')-35:
+        if self.timestep >= get_known('time_steps')-10:
             self.canBuy = False
    
         self.checkConstraints()
@@ -575,7 +575,7 @@ class DecisionMaker(object):
         ## PROCESS DEMAND FROM CSV
         current_demand = self.get_real_ahead_demand(0)
 
-        demands = {t: self.get_real_ahead_demand(t) for t in range(10) }
+        demands = {t: self.get_real_ahead_demand(t) for t in range(7) }
         
 
         lifetimes_left = self.getLifetimesLeft()

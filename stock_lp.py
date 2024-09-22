@@ -32,7 +32,7 @@ class stockLP:
      
         
         self.timestep = timestep
-        self.future_timesteps = 10
+        self.future_timesteps = 7
 
         ## create model 
         self.model = pulp.LpProblem("moves", pulp.LpMaximize)
@@ -88,7 +88,7 @@ class stockLP:
                 for server in self.server_types.values()
                 for t in range(0,self.future_timesteps,1)
 
-                if  server.canBeDeployed(self.timestep) and self.canBuy## server.isProfitable(self.timestep, dc.latency_sensitivity) ##and (self.timestep%2==1 or self.buyOnce)##self.can_buy
+                if  server.canBeDeployed(self.timestep) and self.canBuy and server.isProfitable(self.timestep, dc.latency_sensitivity)## ##and (self.timestep%2==1 or self.buyOnce)##self.can_buy
                 
             ],
             lowBound =0,
@@ -688,7 +688,7 @@ class stockLP:
 
     def getTimestepWeight(self, t):
 
-        return 1/(t+1)
+        return 1##1/(t+1)
     
     
 
