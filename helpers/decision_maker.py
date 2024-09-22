@@ -196,6 +196,11 @@ class DecisionMaker(object):
         if datacenter.name not in self.datacenters:
             raise ValueError(f"Datacenter '{datacenter.name}' does not exist.")
         
+
+        # print(f"cap check: {datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)}")
+        # print(f"slot cap {datacenter.slots_capacity}" )
+
+        
         assert(datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)
                <= datacenter.slots_capacity), f"dc {datacenter.name }datacenter inventory level: {datacenter.inventory_level + (self.server_types[server_type].slots_size * quantity)}  slot cap {datacenter.slots_capacity} "
 
@@ -570,7 +575,7 @@ class DecisionMaker(object):
         ## PROCESS DEMAND FROM CSV
         current_demand = self.get_real_ahead_demand(0)
 
-        demands = {t: self.get_real_ahead_demand(10) for t in range(10) }
+        demands = {t: self.get_real_ahead_demand(t) for t in range(10) }
         
 
         lifetimes_left = self.getLifetimesLeft()
@@ -579,7 +584,7 @@ class DecisionMaker(object):
         
         p = 0.2 if self.seed not in self.p.keys() else self.p[self.seed]
         buyOnce = False if self.seed not in self.buyOnce.keys() else self.buyOnce[self.seed]
-
+        
 
         ## CREATE LINEAR PROGRAMMING PROBLEM
         m = stockLP(self.datacenters,
@@ -602,72 +607,79 @@ class DecisionMaker(object):
         m.solve()
 
 
-        for dc_to, dc in self.datacenters.items():
-            for t in range(10):
+        # for dc_to, dc in self.datacenters.items():
+        #     for t in range(10):
 
-                # print("SLOT CONS ADDED")
-                for var in m.addVariables:
-                    # print(f"VAR NAME {var}")
-                    # print(f"dc {var.split('_')[0]}")
-                    # print(f"t {var.split('_')[2]}")
-                    if var.split("_")[0]==dc_to and var.split("_")[2]==str(t):
-                        # print()
-                        print(f"add var value {var} {m.addVariables[var].varValue}")
+        #         # print("SLOT CONS ADDED")
+        #         for var in m.addVariables:
+        #             # print(f"VAR NAME {var}")
+        #             # print(f"dc {var.split('_')[0]}")
+        #             # print(f"t {var.split('_')[2]}")
+        #             if var.split("_")[0]==dc_to and var.split("_")[2]==str(t):
+        #                 # print()
+        #                 print(f"add var value {var} {m.addVariables[var].varValue}")
                 
-                print ("SUM " + str(
-                                    sum(
-                                         [  
-                                              (m.moveVariables[var].varValue * self.server_types[var.split("_")[2]].slots_size )
-                                                for var in m.moveVariables
-                                                if var.split("_")[1]==dc_to and var.split("_")[3]==str(t)
-                                        ]
+                # print ("SUM " + str(
+                #                     sum(
+                #                          [  
+                #                               (m.moveVariables[var].varValue * self.server_types[var.split("_")[2]].slots_size )
+                #                                 for var in m.moveVariables
+                #                                 if var.split("_")[1]==dc_to and var.split("_")[3]==str(t)
+                #                         ]
                                       
-                                        +
-                                        [
-                                            (m.addVariables[var].varValue * m.server_types[var.split("_")[1]].slots_size)
-                                                for var in m.addVariables
-                                                if var.split("_")[0]==dc_to and var.split("_")[2]==str(t)
-                                        ]
+                #                         +
+                #                         [
+                #                             (m.addVariables[var].varValue * m.server_types[var.split("_")[1]].slots_size)
+                #                                 for var in m.addVariables
+                #                                 if var.split("_")[0]==dc_to and var.split("_")[2]==str(t)
+                #                         ]
                                       
                                         
                                         
-                                        +
-                                        [
-                                           (m.holdVariables[var].varValue * self.server_types[var.split("_")[1]].slots_size )
-                                                for var in m.holdVariables
-                                                if var.split("_")[0] == dc_to and var.split("_")[2]==str(t)
-                                        ]
-                                    )
-                ))
+                #                         +
+                #                         [
+                #                            (m.holdVariables[var].varValue * self.server_types[var.split("_")[1]].slots_size )
+                #                                 for var in m.holdVariables
+                #                                 if var.split("_")[0] == dc_to and var.split("_")[2]==str(t)
+                #                         ]
+                #                     )
+                # ))
 
 
 
         
 
-        for var in m.moveVariables:
-            if var.split("_")[1]=="DC4" and var.split("_")[3]=="0"  :
-                print(f"move: {var} : { m.moveVariables[var].varValue}")
+        # for var in m.moveVariables:
+        #     if var.split("_")[1]=="DC3" and var.split("_")[3]=="0"  :
+        #         print(f"move: {var} : { m.moveVariables[var].varValue}")
+        #         # print(f"move bound var: {var} : { m.moveVariables[var].upBound}")
 
-        for var in m.addVariables:
-            if var.split("_")[0]=="DC4"  and var.split("_")[2]=="0":
-                print(f"add: {var} : { m.addVariables[var].varValue}")
+        # for var in m.addVariables:
+        #     if var.split("_")[0]=="DC3"  and var.split("_")[2]=="0":
+        #         print(f"add: {var} : { m.addVariables[var].varValue}")
+        #         # print(f"add bound var: {var} : { m.addVariables[var].upBound}")
 
-        for var in m.holdVariables:
-            if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
-                print(f"hold: {var} : {m.holdVariables[var].varValue}")
+        # for var in m.holdVariables:
+        #     if var.split("_")[0]=="DC3"  and  var.split("_")[2]=="0":
+        #         print(f"hold: {var} : {m.holdVariables[var].varValue}")
+        #         # print(f"hold bound var: {var} : { m.holdVariables[var].upBound}")
 
 
-        for var in m.removeVariables:
-                    if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
-                        print(f"remove: {var} : {m.removeVariables[var].varValue}")
+        # for var in m.removeVariables:
+        #             if var.split("_")[0]=="DC3"  and  var.split("_")[2]=="0":
+        #                 print(f"remove: {var} : {m.removeVariables[var].varValue}")
+        #                 # print(f"remove bound var: {var} : { m.removeVariables[var].upBound}")
 
-        for var in m.increaseVariables:
-                    if var.split("_")[0]=="DC4"  and  var.split("_")[2]=="0":
-                        print(f"increase: {var} : {m.increaseVariables[var].varValue}")
+        # for var in m.increaseVariables:
+        #             if var.split("_")[0]=="DC3"  and  var.split("_")[2]=="0":
+        #                 print(f"increase: {var} : {m.increaseVariables[var].varValue}")
+        #                 # print(f"increase bound var: {var} : { m.increaseVariables[var].upBound}")
+                        
 
-        for var in m.stockVariables:
-                    if var.split("_")[0]=="DC4":##  and  var.split("_")[2]=="0":
-                        print(f"stock: {var} : {m.stockVariables[var].varValue}")
+        # for var in m.stockVariables:
+        #             if var.split("_")[0]=="DC3":##  and  var.split("_")[2]=="0":
+        #                 print(f"stock: {var} : {m.stockVariables[var].varValue}")
+        #                 # print(f"stock bound var: {var} : { m.stockVariables[var].upBound}")
 
 
 
@@ -905,6 +917,6 @@ class DecisionMaker(object):
         P = self.calculateProfit(demand, move_ids)
 
         
-        objective_value = U*L*P
+        objective_value = P
 
         return objective_value
