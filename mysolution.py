@@ -15,9 +15,9 @@ def get_my_solution(d, s):
     
     decision_maker = DecisionMaker(datacenters,servers,selling_prices, d, s)
 
-    fleet, prices = decision_maker.solve()
+    fleet, prices, O = decision_maker.solve()
 
-    return pd.DataFrame(fleet), pd.DataFrame(prices)
+    return pd.DataFrame(fleet), pd.DataFrame(prices), O
     
 
 
@@ -26,6 +26,7 @@ def get_my_solution(d, s):
 seeds = known_seeds()
 
 demand = pd.read_csv('./data/demand.csv')
+OS = []
 for seed in seeds:
     # SET THE RANDOM SEED
     np.random.seed(seed)
@@ -34,8 +35,10 @@ for seed in seeds:
     actual_demand = get_actual_demand(demand)
 
     # CALL YOUR APPROACH HERE
-    fleet, pricing_strategy = get_my_solution(actual_demand, seed)
+    fleet, pricing_strategy, O = get_my_solution(actual_demand, seed)
+    OS.append(O)
 
     # SAVE YOUR SOLUTION
     save_solution(fleet, pricing_strategy, f'./output/{seed}.json')
 
+print("Average score: " + str(np.mean(OS)))

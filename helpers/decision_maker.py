@@ -649,7 +649,7 @@ class DecisionMaker(object):
         for t in range(1, get_known('time_steps')+1):
             self.step()
         
-        return self.solution, self.sellingPrices
+        return self.solution, self.sellingPrices, self.OBJECTIVE
     
 
     
@@ -802,11 +802,11 @@ class DecisionMaker(object):
     # Calculate the objective value. 
     def calculateObjective(self, demand, move_ids) -> float:
         
-        U = self.calculateUtilization(demand)
-        L = self.calculateLifespan()
+        # U = self.calculateUtilization(demand)
+        # L = self.calculateLifespan()
         P = self.calculateProfit(demand, move_ids)
 
         
-        objective_value = U*L*P
+        objective_value = P
 
         return objective_value

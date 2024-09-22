@@ -274,7 +274,7 @@ class moveLP:
         for var in self.increaseVariables:
             self.model += self.increaseVariables[var]>=0
         for var in self.decreaseVariables:
-            self.model += self.increaseVariables[var]>=0
+            self.model += self.decreaseVariables[var]>=0
 
         ## makes sure increase and decrease variables cannot be the same as one another
         for dc in self.datacenters:
