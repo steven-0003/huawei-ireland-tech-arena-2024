@@ -575,7 +575,11 @@ class DecisionMaker(object):
         ## PROCESS DEMAND FROM CSV
         current_demand = self.get_real_ahead_demand(0)
 
-        demands = {t: self.get_real_ahead_demand(t) for t in range(7) }
+        demands = {t: self.get_real_ahead_demand(t) for t in range(12) }
+        # for t in demands.keys():
+        #     for latency in get_known('latency_sensitivity'):
+        #         for server_type in self.server_types.keys():
+        #             demands[t][latency][server_type]
         
 
         lifetimes_left = self.getLifetimesLeft()
@@ -754,7 +758,7 @@ class DecisionMaker(object):
     def solve(self):
 
 
-        self.buyServers(self.datacenters["DC4"], "CPU.S1", 100)
+        # self.buyServers(self.datacenters["DC4"], "CPU.S1", 100)
 
         for t in range(1, get_known('time_steps')+1):
             self.step()
