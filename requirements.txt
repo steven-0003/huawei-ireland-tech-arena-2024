@@ -1,3 +1,10 @@
 pandas==2.2.2
 numpy==1.26.4
 scipy==1.13.1
+typing_extensions==4.12.2
+pulp==2.9.0
+ipykernel==6.29.5
+matplotlib==3.9.2
+torch==2.4.1
+torcheval==0.0.7
+scikit-learn==1.5.2
