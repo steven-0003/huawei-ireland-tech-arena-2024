@@ -5,7 +5,7 @@ from evaluation import get_known, adjust_capacity_by_failure_rate, get_maintenan
 from helpers.datacenters import Datacenter
 from helpers.server_type import Server
 
-from waqee import moveLP
+from linear_programming import moveLP
 
 class DecisionMaker(object):
     """
