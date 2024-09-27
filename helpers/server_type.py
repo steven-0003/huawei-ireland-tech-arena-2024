@@ -75,7 +75,7 @@ class Server(object):
         return get_known("time_steps")- self.getTimeTillProfitable(latency_sensitivity=latency) > timestep           
 
     def getTimeTillProfitable(self, latency_sensitivity: str) -> float:
-        """The time until the server is profitable
+        """The time until the server is no longer profitable
 
         Args:
             latency_sensitivity (str): The latency sensitivity that requires this server generation

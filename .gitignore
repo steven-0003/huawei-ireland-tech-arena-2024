@@ -4,3 +4,4 @@ __pycache__
 output
 myenv
 *.png
+lstm_models
