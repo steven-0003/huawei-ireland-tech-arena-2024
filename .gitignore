@@ -1,2 +1,7 @@
 .venv
 __pycache__
+*.log
+output
+myenv
+*.png
+lstm_models
